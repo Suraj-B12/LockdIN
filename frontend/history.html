@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History — LockdIN</title>
+    <meta name="description" content="Review your past focus sessions and track your progress.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/history.css">
+</head>
+
+<body>
+    <div class="page-loading" id="loadingScreen">
+        <div class="page-loading-spinner"></div>
+    </div>
+    <div class="page-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="dash-navbar">
+        <a href="/dashboard.html" class="dash-logo">
+            <span class="logo-lock">Lockd</span><span class="logo-in">IN</span>
+        </a>
+        <div class="dash-nav-links">
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/leaderboard.html">Leaderboard</a>
+            <a href="/history.html" class="active">History</a>
+            <a href="/profile.html">Profile</a>
+        </div>
+        <div class="dash-nav-right">
+            <div class="dash-user-avatar-placeholder" id="navAvatar">?</div>
+        </div>
+    </nav>
+
+    <main class="hist-main">
+        <div class="hist-header">
+            <h1>Session History</h1>
+            <p class="hist-subtitle">Your focus journey, one session at a time</p>
+        </div>
+
+        <!-- Heatmap -->
+        <div class="heatmap-card">
+            <div class="card-header">
+                <span class="card-title">Activity — Last 12 Weeks</span>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="heatmap-stats" id="heatmapStats">
+                <div class="heatmap-stat">
+                    <span class="heatmap-stat-value" id="statTotalSessions">0</span>
+                    <span class="heatmap-stat-label">Sessions</span>
+                </div>
+                <div class="heatmap-stat">
+                    <span class="heatmap-stat-value" id="statTotalHours">0h</span>
+                    <span class="heatmap-stat-label">Total Focus</span>
+                </div>
+                <div class="heatmap-stat">
+                    <span class="heatmap-stat-value" id="statActiveDays">0</span>
+                    <span class="heatmap-stat-label">Active Days</span>
+                </div>
+                <div class="heatmap-stat">
+                    <span class="heatmap-stat-value" id="statBestDay">—</span>
+                    <span class="heatmap-stat-label">Best Day</span>
+                </div>
+            </div>
+
+            <!-- Heatmap Grid with labels -->
+            <div class="heatmap-container">
+                <div class="heatmap-day-labels">
+                    <span></span>
+                    <span>Mon</span>
+                    <span></span>
+                    <span>Wed</span>
+                    <span></span>
+                    <span>Fri</span>
+                    <span></span>
+                </div>
+                <div class="heatmap-body">
+                    <div class="heatmap-month-labels" id="heatmapMonthLabels">
+                        <!-- Rendered by JS -->
+                    </div>
+                    <div class="heatmap-grid" id="heatmapGrid">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tooltip (rendered by JS) -->
+            <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+
+            <div class="heatmap-legend">
+                <span>Less</span>
+                <div class="heatmap-cell level-0"></div>
+                <div class="heatmap-cell level-1"></div>
+                <div class="heatmap-cell level-2"></div>
+                <div class="heatmap-cell level-3"></div>
+                <div class="heatmap-cell level-4"></div>
+                <span>More</span>
+            </div>
+        </div>
+
+        <!-- Session List -->
+        <div class="session-list-card">
+            <div class="card-header">
+                <span class="card-title">All Sessions</span>
+                <span class="session-count" id="sessionCount">0 sessions</span>
+            </div>
+            <div class="session-feed" id="sessionFeed">
+                <div class="hist-empty" id="histEmpty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        opacity="0.3">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <p>No sessions recorded yet</p>
+                </div>
+            </div>
+            <button class="load-more-btn" id="loadMoreBtn" style="display:none">Load More</button>
+        </div>
+    </main>
+
+    <div class="page-error-toast" id="errorToast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js?v=4"></script>
+    <script src="js/api.js?v=4"></script>
+    <script src="js/history.js?v=4"></script>
+</body>
+
+</html>

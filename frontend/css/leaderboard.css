@@ -1,0 +1,540 @@
+/* ============================================
+   LockdIN — Leaderboard Page
+   Shares nav/bg styles with dashboard tokens
+   ============================================ */
+
+:root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #111118;
+    --bg-card: rgba(17, 17, 24, 0.85);
+    --bg-card-solid: #15151e;
+    --border-color: rgba(255, 255, 255, 0.06);
+    --border-hover: rgba(255, 255, 255, 0.12);
+    --text-primary: #f0f0f5;
+    --text-secondary: rgba(240, 240, 245, 0.6);
+    --text-muted: rgba(240, 240, 245, 0.35);
+    --accent: #00B8A9;
+    --accent-glow: rgba(0, 184, 169, 0.15);
+    --accent-hover: #00d4c3;
+    --accent-dim: rgba(0, 184, 169, 0.5);
+    --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 20px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-main);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+/* ---- Shared components (same as dashboard) ---- */
+.page-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.page-bg .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.08;
+}
+
+.page-bg .orb-1 {
+    width: 600px;
+    height: 600px;
+    background: var(--accent);
+    top: -200px;
+    right: -100px;
+}
+
+.page-bg .orb-2 {
+    width: 400px;
+    height: 400px;
+    background: #6366f1;
+    bottom: -100px;
+    left: -50px;
+}
+
+.page-loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: opacity 0.3s;
+}
+
+.page-loading.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.page-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255, 255, 255, 0.08);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.page-error-toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 12px 24px;
+    border-radius: var(--radius-sm);
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    font-size: 0.85rem;
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.page-error-toast.visible {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Nav (same as dashboard) */
+.dash-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: rgba(10, 10, 15, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    z-index: 100;
+}
+
+.dash-logo {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+.dash-logo .logo-lock {
+    color: var(--text-primary);
+}
+
+.dash-logo .logo-in {
+    color: var(--accent);
+}
+
+.dash-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.dash-nav-links a {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.dash-nav-links a:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.dash-nav-links a.active {
+    color: var(--text-primary);
+    background: rgba(0, 184, 169, 0.12);
+    font-weight: 600;
+}
+
+.dash-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dash-user-avatar-placeholder {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--accent-glow);
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--accent);
+}
+
+.dash-user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+}
+
+/* ---- Main Content ---- */
+.lb-main {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 100px 24px 60px;
+}
+
+.lb-header {
+    margin-bottom: 28px;
+}
+
+.lb-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+.lb-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    margin-top: 4px;
+}
+
+/* Tabs */
+.lb-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+}
+
+.lb-tab {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-main);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.lb-tab:hover {
+    color: var(--text-primary);
+}
+
+.lb-tab.active {
+    background: rgba(0, 184, 169, 0.12);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Your Rank Card */
+.your-rank-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    border-radius: var(--radius-md);
+    background: var(--accent-glow);
+    border: 1px solid rgba(0, 184, 169, 0.15);
+    margin-bottom: 20px;
+}
+
+.your-rank-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.your-rank-number {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    margin-left: auto;
+}
+
+.your-rank-score {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+
+/* Rankings List */
+.lb-rankings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 200px;
+}
+
+.lb-entry {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
+    animation: fade-in-up 0.4s ease backwards;
+}
+
+.lb-entry:hover {
+    border-color: var(--border-hover);
+}
+
+.lb-entry.is-you {
+    background: rgba(0, 184, 169, 0.08);
+    border-color: rgba(0, 184, 169, 0.15);
+}
+
+.lb-entry-rank {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.lb-entry-rank.gold {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.lb-entry-rank.silver {
+    background: rgba(156, 163, 175, 0.15);
+    color: #9ca3af;
+}
+
+.lb-entry-rank.bronze {
+    background: rgba(217, 119, 6, 0.15);
+    color: #d97706;
+}
+
+.lb-entry-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+}
+
+.lb-entry-avatar-ph {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.lb-entry-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.lb-entry-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lb-entry-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.lb-entry-score {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.lb-empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+}
+
+.lb-empty p {
+    margin-top: 12px;
+    font-size: 0.88rem;
+}
+
+.lb-empty-sub {
+    font-size: 0.78rem !important;
+    margin-top: 4px !important;
+}
+
+/* ---- Add Friend ---- */
+.add-friend-section {
+    margin-top: 40px;
+    padding: 28px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+
+.add-friend-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+.add-friend-form {
+    display: flex;
+    gap: 10px;
+}
+
+.add-friend-input {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    font-size: 0.85rem;
+    transition: border-color var(--transition);
+}
+
+.add-friend-input:focus {
+    outline: none;
+    border-color: var(--accent-dim);
+}
+
+.add-friend-input::placeholder {
+    color: var(--text-muted);
+}
+
+.add-friend-btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--accent);
+    color: #0a0a0f;
+    font-family: var(--font-main);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.add-friend-btn:hover {
+    background: var(--accent-hover);
+}
+
+.add-friend-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.add-friend-status {
+    font-size: 0.78rem;
+    margin-top: 10px;
+    min-height: 18px;
+}
+
+.add-friend-status.success {
+    color: #22c55e;
+}
+
+.add-friend-status.error {
+    color: #fca5a5;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .dash-nav-links {
+        display: none;
+    }
+
+    .lb-main {
+        padding: 80px 16px 40px;
+    }
+
+    .lb-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .add-friend-form {
+        flex-direction: column;
+    }
+}

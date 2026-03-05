@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — LockdIN</title>
+    <meta name="description"
+        content="Your LockdIN dashboard — track focus sessions, monitor your streak, and compete with friends.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+
+<body>
+    <!-- Loading Screen -->
+    <div class="dash-loading" id="loadingScreen">
+        <div class="dash-loading-spinner"></div>
+        <p>Loading your dashboard...</p>
+    </div>
+
+    <!-- Background Effects -->
+    <div class="dash-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <!-- ========== NAVIGATION ========== -->
+    <nav class="dash-navbar">
+        <a href="/dashboard.html" class="dash-logo">
+            <span class="logo-lock">Lockd</span><span class="logo-in">IN</span>
+        </a>
+
+        <div class="dash-nav-links">
+            <a href="/dashboard.html" class="active">Dashboard</a>
+            <a href="/leaderboard.html">Leaderboard</a>
+            <a href="/history.html">History</a>
+            <a href="/profile.html">Profile</a>
+        </div>
+
+        <div class="dash-nav-right">
+            <div class="dash-user-avatar-placeholder" id="navAvatar">?</div>
+            <button class="btn-signout" id="signOutBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sign Out
+            </button>
+        </div>
+    </nav>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="dash-main" id="dashMain">
+
+        <!-- Greeting -->
+        <div class="dash-greeting">
+            <h1>Hello, <span class="accent-name" id="greetingName">User</span></h1>
+            <p class="greeting-sub" id="greetingSub">Ready to lock in?</p>
+        </div>
+
+        <!-- Bento Grid -->
+        <div class="bento-grid">
+
+            <!-- 1. FOCUS TIMER (5 cols) -->
+            <div class="bento-card card-timer">
+                <div class="card-header">
+                    <span class="card-title">Focus Timer</span>
+                    <span class="timer-status idle" id="timerStatus">Ready</span>
+                </div>
+                <div class="timer-display">
+                    <div class="timer-value">
+                        <span class="timer-digits" id="timerDigits">00:00:00</span>
+                        <span class="timer-label">elapsed</span>
+                    </div>
+                    <div class="timer-controls" id="timerControls">
+                        <button class="timer-btn timer-btn-primary" id="timerStartBtn">
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                            Start Focus
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. BUDDY (3 cols) -->
+            <div class="bento-card card-buddy">
+                <div class="card-header">
+                    <span class="card-title">Your Buddy</span>
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
+                            </path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="buddy-display">
+                    <div class="buddy-avatar-wrap">
+                        <img class="buddy-avatar-img" id="buddyAvatarImg" style="display:none" alt="Your buddy">
+                        <div class="buddy-emoji-fallback" id="buddyEmojiFallback">😊</div>
+                        <div class="buddy-mood-badge" id="buddyMoodBadge">😊</div>
+                    </div>
+                    <div class="buddy-name" id="buddyName">Buddy</div>
+                    <div class="buddy-mood-text" id="buddyMoodText">Happy</div>
+                </div>
+            </div>
+
+            <!-- 3. STREAK (4 cols) -->
+            <div class="bento-card card-streak">
+                <div class="card-header">
+                    <span class="card-title">Current Streak</span>
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="streak-display">
+                    <div class="streak-number" id="streakNumber">0<span class="streak-unit">days</span></div>
+                    <div class="streak-subtitle" id="streakSubtitle">Start your first session!</div>
+                    <div class="streak-chart" id="streakChart">
+                        <!-- 7 bars rendered by JS -->
+                    </div>
+                    <div class="streak-meta">
+                        <div class="streak-meta-item">
+                            <div class="streak-meta-value" id="longestStreak">0</div>
+                            <div class="streak-meta-label">Longest</div>
+                        </div>
+                        <div class="streak-meta-item">
+                            <div class="streak-meta-value" id="totalSessions">0</div>
+                            <div class="streak-meta-label">Sessions</div>
+                        </div>
+                        <div class="streak-meta-item">
+                            <div class="streak-meta-value" id="totalHours">0<span class="qs-unit">h</span></div>
+                            <div class="streak-meta-label">Total</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. TODAY'S SCORE (4 cols) -->
+            <div class="bento-card card-score">
+                <div class="card-header">
+                    <span class="card-title">Today's Score</span>
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </div>
+                </div>
+                <div class="score-display">
+                    <div class="score-value-simple">
+                        <span class="score-number" id="scoreNumber">—</span>
+                        <span class="score-label">/ 100</span>
+                    </div>
+                    <p class="score-summary" id="scoreSummary">Complete a session to get your AI score</p>
+                </div>
+            </div>
+
+            <!-- 5. RECENT SESSIONS (5 cols) -->
+            <div class="bento-card card-recent">
+                <div class="card-header">
+                    <span class="card-title">Recent Sessions</span>
+                    <a href="/history.html" class="lb-link" style="margin:0">View All →</a>
+                </div>
+                <ul class="session-list" id="sessionList">
+                    <li class="empty-state">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <p>No sessions yet. Hit Start to begin!</p>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 6. LEADERBOARD PREVIEW (3 cols) -->
+            <div class="bento-card card-leaderboard">
+                <div class="card-header">
+                    <span class="card-title">Leaderboard</span>
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                </div>
+                <ul class="lb-list" id="lbList">
+                    <li class="empty-state">
+                        <p>Add friends to see rankings</p>
+                    </li>
+                </ul>
+                <a href="/leaderboard.html" class="lb-link">See Full Rankings →</a>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ========== WORK LOG MODAL ========== -->
+    <div class="modal-overlay" id="workLogModal">
+        <div class="modal-card">
+            <h2 class="modal-title">What did you work on?</h2>
+            <p class="modal-sub">Describe your session so your AI scorer can evaluate it.</p>
+            <textarea class="modal-textarea" id="workLogInput"
+                placeholder="e.g. Studied data structures — trees, heaps, and priority queues. Solved 3 LeetCode problems."></textarea>
+            <div class="modal-actions">
+                <button class="timer-btn timer-btn-secondary" id="workLogSkip">Skip</button>
+                <button class="timer-btn timer-btn-primary" id="workLogSubmit">Submit & Score</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="dash-error-toast" id="errorToast"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js?v=4"></script>
+    <script src="js/api.js?v=4"></script>
+    <script src="js/dashboard.js?v=4"></script>
+</body>
+
+</html>

@@ -1,0 +1,60 @@
+# ============================================
+# LockdIN — Docker Compose (Development Mode)
+# Start everything: docker compose up --build
+# ============================================
+
+services:
+  # ---- Redis Cache ----
+  redis:
+    image: redis:7-alpine
+    container_name: lockdin-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ---- Ollama AI ----
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lockdin-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+
+  # ---- FastAPI Backend ----
+  api:
+    build: ./backend
+    container_name: lockdin-api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://ollama:11434
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app # Hot reload — changes reflect instantly
+    restart: unless-stopped
+
+  # ---- Nginx Frontend ----
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: lockdin-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

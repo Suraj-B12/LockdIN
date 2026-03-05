@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard — LockdIN</title>
+    <meta name="description" content="See how you rank against your friends on LockdIN.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/leaderboard.css">
+</head>
+
+<body>
+    <!-- Loading -->
+    <div class="page-loading" id="loadingScreen">
+        <div class="page-loading-spinner"></div>
+    </div>
+
+    <!-- Background -->
+    <div class="page-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="dash-navbar">
+        <a href="/dashboard.html" class="dash-logo">
+            <span class="logo-lock">Lockd</span><span class="logo-in">IN</span>
+        </a>
+        <div class="dash-nav-links">
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/leaderboard.html" class="active">Leaderboard</a>
+            <a href="/history.html">History</a>
+            <a href="/profile.html">Profile</a>
+        </div>
+        <div class="dash-nav-right">
+            <div class="dash-user-avatar-placeholder" id="navAvatar">?</div>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="lb-main">
+        <div class="lb-header">
+            <h1>Leaderboard</h1>
+            <p class="lb-subtitle">See how you stack up against your friends</p>
+        </div>
+
+        <!-- Period Tabs -->
+        <div class="lb-tabs" id="lbTabs">
+            <button class="lb-tab active" data-period="daily">Today</button>
+            <button class="lb-tab" data-period="weekly">This Week</button>
+            <button class="lb-tab" data-period="alltime">All Time</button>
+        </div>
+
+        <!-- Your Rank Card -->
+        <div class="your-rank-card" id="yourRankCard" style="display:none">
+            <span class="your-rank-label">Your Rank</span>
+            <span class="your-rank-number" id="yourRankNumber">#—</span>
+            <span class="your-rank-score" id="yourRankScore">0 pts</span>
+        </div>
+
+        <!-- Rankings List -->
+        <div class="lb-rankings" id="lbRankings">
+            <div class="lb-empty" id="lbEmpty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    opacity="0.3">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <p>Add friends to see your leaderboard</p>
+                <p class="lb-empty-sub">Share your invite code from your Profile page</p>
+            </div>
+        </div>
+
+        <!-- Add Friend Section -->
+        <div class="add-friend-section">
+            <h3>Add a Friend</h3>
+            <div class="add-friend-form" id="addFriendForm">
+                <input type="text" id="inviteCodeInput" placeholder="Enter invite code or email"
+                    class="add-friend-input">
+                <button class="add-friend-btn" id="addFriendBtn">Send Request</button>
+            </div>
+            <p class="add-friend-status" id="addFriendStatus"></p>
+        </div>
+    </main>
+
+    <!-- Error Toast -->
+    <div class="page-error-toast" id="errorToast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js?v=3"></script>
+    <script src="js/api.js?v=3"></script>
+    <script src="js/leaderboard.js?v=3"></script>
+</body>
+
+</html>
