@@ -85,6 +85,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             item.addEventListener('click', () => selectAvatar(i, item));
             avatarGrid.appendChild(item);
+
+            // Crop transparent padding from avatar image
+            const avatarImg = item.querySelector('.avatar-img');
+            const originalSrc = avatarImg.src;
+            cropTransparent(originalSrc).then(cropped => { avatarImg.src = cropped; }).catch(() => { });
         }
     }
 
@@ -103,8 +108,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     buddyContinueBtn.addEventListener('click', () => {
         if (!selectedAvatarIndex) return;
-        // Set the preview image in the naming step
-        namingAvatarPreview.src = `Avatars/Avatar ${selectedAvatarIndex}/${DEFAULT_MOOD_IMG}`;
+        // Set the preview image in the naming step (cropped)
+        const previewSrc = `Avatars/Avatar ${selectedAvatarIndex}/${DEFAULT_MOOD_IMG}`;
+        cropTransparent(previewSrc).then(cropped => {
+            namingAvatarPreview.src = cropped;
+        }).catch(() => {
+            namingAvatarPreview.src = previewSrc;
+        });
         transitionStep(stepBuddy, stepNaming);
 
         // Focus the input after transition

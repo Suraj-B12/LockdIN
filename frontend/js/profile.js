@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profInviteCode = document.getElementById('profInviteCode');
     const copyInviteBtn = document.getElementById('copyInviteBtn');
     const profBuddyImg = document.getElementById('profBuddyImg');
+    const profBuddyEmojiFallback = document.getElementById('profBuddyEmojiFallback');
+    const profBuddyMoodBadge = document.getElementById('profBuddyMoodBadge');
     const profBuddyName = document.getElementById('profBuddyName');
     const profBuddyMood = document.getElementById('profBuddyMood');
     const profBuddyStreak = document.getElementById('profBuddyStreak');
@@ -109,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ---- Load buddy ----
-    const profBuddyEmojiFallback = document.getElementById('profBuddyEmojiFallback');
 
     async function loadBuddy() {
         try {
@@ -122,16 +123,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             const moodInfo = getMoodInfo(moodLevel);
 
             if (avatarNum) {
-                profBuddyImg.src = `Avatars/Avatar ${avatarNum}/${moodInfo.file}`;
-                profBuddyImg.style.display = '';
+                const imgPath = `Avatars/Avatar ${avatarNum}/${moodInfo.file}`;
                 profBuddyEmojiFallback.style.display = 'none';
-                profBuddyImg.onerror = () => {
+                profBuddyMoodBadge.textContent = moodInfo.emoji;
+                profBuddyMoodBadge.style.display = '';
+                cropTransparent(imgPath).then(croppedSrc => {
+                    profBuddyImg.src = croppedSrc;
+                    profBuddyImg.style.display = '';
+                }).catch(() => {
                     profBuddyImg.style.display = 'none';
                     profBuddyEmojiFallback.style.display = '';
                     profBuddyEmojiFallback.textContent = moodInfo.emoji;
-                };
+                    profBuddyMoodBadge.style.display = 'none';
+                });
             } else {
                 profBuddyEmojiFallback.textContent = moodInfo.emoji;
+                profBuddyEmojiFallback.style.display = '';
+                profBuddyMoodBadge.style.display = 'none';
             }
 
             profBuddyMood.textContent = `${moodInfo.text} ${moodInfo.emoji}`;
@@ -152,11 +160,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const file = String(m).padStart(2, '0') + '.png';
             const img = document.createElement('img');
             img.className = 'prof-mood-thumb';
-            img.src = `Avatars/Avatar ${avatarNum}/${file}`;
             img.alt = MOOD_TABLE[m - 1]?.text || `Mood ${m}`;
             img.title = `Mood ${m}: ${MOOD_TABLE[m - 1]?.text || ''}`;
             if (m === currentMood) img.classList.add('active');
             profMoodGallery.appendChild(img);
+
+            const src = `Avatars/Avatar ${avatarNum}/${file}`;
+            cropTransparent(src).then(cropped => { img.src = cropped; }).catch(() => { img.src = src; });
         }
     }
 

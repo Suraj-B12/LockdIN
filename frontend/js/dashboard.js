@@ -331,18 +331,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const moodInfo = getMoodInfo(moodLevel);
 
             if (avatarNum) {
-                // User picked an avatar during onboarding — show image, hide emoji
-                buddyAvatarImg.src = `Avatars/Avatar ${avatarNum}/${moodInfo.file}`;
-                buddyAvatarImg.style.display = '';
+                // User picked an avatar during onboarding — show cropped image, hide emoji
+                const imgPath = `Avatars/Avatar ${avatarNum}/${moodInfo.file}`;
                 buddyEmojiFallback.style.display = 'none';
                 buddyMoodBadge.style.display = '';
-                buddyAvatarImg.onerror = () => {
-                    // Image failed — revert to emoji fallback
+                cropTransparent(imgPath).then(croppedSrc => {
+                    buddyAvatarImg.src = croppedSrc;
+                    buddyAvatarImg.style.display = '';
+                }).catch(() => {
                     buddyAvatarImg.style.display = 'none';
                     buddyEmojiFallback.style.display = '';
                     buddyEmojiFallback.textContent = moodInfo.emoji;
                     buddyMoodBadge.style.display = 'none';
-                };
+                });
             } else {
                 // Default buddy_type (e.g. 'cat') — update emoji content
                 buddyEmojiFallback.textContent = moodInfo.emoji;
