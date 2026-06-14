@@ -1,0 +1,29 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vite PWA generated artifacts
+dev-dist
+
+# TypeScript build-info + emitted config artifacts (tsc -b byproducts; Vite uses
+# vite.config.ts directly — the emitted .js/.d.ts are not used and pollute git)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

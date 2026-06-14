@@ -1,7 +1,7 @@
 """Buddy system endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from middleware.auth import get_current_user
+from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
 from models.schemas import BuddyResponse, BuddyUpdate
 
@@ -40,6 +40,7 @@ async def update_my_buddy(body: BuddyUpdate, user: dict = Depends(get_current_us
 @router.get("/friend/{friend_id}", response_model=BuddyResponse)
 async def get_friend_buddy(friend_id: str, user: dict = Depends(get_current_user)):
     """View a friend's buddy (for social features)."""
+    friend_id = valid_uuid(friend_id, not_found_detail="Buddy not found.")
     db = get_supabase()
 
     # Verify they are friends

@@ -44,7 +44,8 @@ CREATE TABLE public.ai_scores (
     session_id UUID UNIQUE NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
     score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
     summary TEXT,
-    model_used TEXT NOT NULL DEFAULT 'mistral',
+    model_used TEXT NOT NULL DEFAULT 'algorithm-provisional',
+    breakdown JSONB,  -- algorithm factor breakdown (duration/work-log/specificity points)
     scored_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -90,6 +91,24 @@ CREATE TABLE public.friendships (
 CREATE INDEX idx_friendships_user ON public.friendships(user_id);
 CREATE INDEX idx_friendships_friend ON public.friendships(friend_id);
 
+-- ========== NOTIFICATION PREFERENCES ==========
+-- Per-user push/email notification toggles (1 per user).
+-- unsubscribe_token gates the public one-click email unsubscribe endpoint.
+CREATE TABLE public.notification_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    push_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    friend_session_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+    inactivity_reminders BOOLEAN NOT NULL DEFAULT TRUE,
+    buddy_mood_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+    nudge_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    unsubscribe_token UUID NOT NULL DEFAULT gen_random_uuid(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_notif_prefs_user ON public.notification_preferences(user_id);
+
 -- ========== ROW LEVEL SECURITY ==========
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
@@ -97,6 +116,7 @@ ALTER TABLE public.ai_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.buddies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: users can read all profiles, update only their own
 CREATE POLICY "Profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
@@ -127,8 +147,15 @@ CREATE POLICY "Users can create friendships" ON public.friendships FOR INSERT WI
 CREATE POLICY "Users can update own friendships" ON public.friendships FOR UPDATE
     USING (auth.uid() = user_id OR auth.uid() = friend_id);
 
+-- Notification preferences: users can view + manage only their own
+CREATE POLICY "Users can view own notification prefs" ON public.notification_preferences FOR SELECT
+    USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own notification prefs" ON public.notification_preferences FOR ALL
+    USING (auth.uid() = user_id);
+
 -- ========== AUTO-CREATE PROFILE ON SIGNUP ==========
 -- When a new user signs up via Supabase Auth, auto-create their profile + buddy
+-- + default notification preferences.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -140,6 +167,7 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', NULL)
     );
     INSERT INTO public.buddies (user_id) VALUES (NEW.id);
+    INSERT INTO public.notification_preferences (user_id) VALUES (NEW.id);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

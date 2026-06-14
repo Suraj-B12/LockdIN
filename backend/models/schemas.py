@@ -20,7 +20,8 @@ class ProfileResponse(BaseModel):
 
 class ProfileUpdate(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    avatar_url: Optional[str] = None
+    # Capped at a standard max URL length so we don't persist oversized blobs.
+    avatar_url: Optional[str] = Field(None, max_length=2048)
 
 
 # ========== SESSION ==========
@@ -56,6 +57,7 @@ class AIScoreResponse(BaseModel):
     summary: str
     model_used: str
     scored_at: datetime
+    breakdown: Optional[dict] = None  # algorithm factor breakdown (additive)
 
 
 # ========== STREAK ==========
@@ -88,7 +90,9 @@ class BuddyResponse(BaseModel):
 
 
 class BuddyUpdate(BaseModel):
-    buddy_type: Optional[str] = None
+    # buddy_type is a free-form string the frontend normalizes to an avatar
+    # index (e.g. "Avatar 7"); we only cap its length to avoid storing junk.
+    buddy_type: Optional[str] = Field(None, min_length=1, max_length=50)
     buddy_name: Optional[str] = Field(None, min_length=1, max_length=30)
 
 
@@ -138,3 +142,26 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     services: dict[str, str]
+
+
+# ========== NOTIFICATION PREFERENCES ==========
+
+class NotificationPrefsResponse(BaseModel):
+    user_id: UUID
+    push_enabled: bool
+    email_enabled: bool
+    friend_session_alerts: bool
+    inactivity_reminders: bool
+    buddy_mood_alerts: bool
+    nudge_enabled: bool
+    # Per-user token guarding the public one-click unsubscribe link (additive).
+    unsubscribe_token: Optional[UUID] = None
+
+
+class NotificationPrefsUpdate(BaseModel):
+    push_enabled: Optional[bool] = None
+    email_enabled: Optional[bool] = None
+    friend_session_alerts: Optional[bool] = None
+    inactivity_reminders: Optional[bool] = None
+    buddy_mood_alerts: Optional[bool] = None
+    nudge_enabled: Optional[bool] = None

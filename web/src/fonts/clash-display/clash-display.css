@@ -1,0 +1,30 @@
+/* Clash Display — self-hosted (Fontshare). WOFF2 weights bundled locally so we
+   never depend on a production CDN <link>. Imported by src/styles/globals.css. */
+@font-face {
+  font-family: "Clash Display";
+  src: url("./ClashDisplay-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Clash Display";
+  src: url("./ClashDisplay-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Clash Display";
+  src: url("./ClashDisplay-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Clash Display";
+  src: url("./ClashDisplay-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

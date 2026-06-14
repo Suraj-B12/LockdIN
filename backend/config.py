@@ -19,15 +19,33 @@ class Settings(BaseSettings):
     onesignal_app_id: str
     onesignal_api_key: str
 
-    # Redis
-    redis_url: str = "redis://redis:6379"
+    # OpenRouter (AI scoring) — primary + two fallbacks, tried in order.
+    # Free models rotate and get rate-limited; verified live 2026-06-14:
+    # gpt-oss-120b + gpt-oss-20b respond reliably (HTTP 200), gemma-4-31b-it
+    # recovers after transient 429s. llama-3.3-70b-instruct:free was persistently
+    # 429 (rate-limited upstream) so it was dropped in favour of gpt-oss-20b.
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openai/gpt-oss-120b:free"
+    openrouter_fallback_model: str = "openai/gpt-oss-20b:free"
+    openrouter_fallback_model_2: str = "google/gemma-4-31b-it:free"
 
-    # Ollama
+    # Legacy local services — kept optional so old .env files don't break,
+    # but no longer required (Ollama replaced by OpenRouter, Redis by in-process cache).
+    redis_url: str = "redis://redis:6379"
     ollama_url: str = "http://ollama:11434"
 
     # App
     jwt_secret: str
     environment: str = "development"
+
+    # Cron / scheduler. On a free host that sleeps, set scheduler_enabled=false
+    # and drive the periodic jobs from an EXTERNAL cron hitting /api/cron/* with
+    # this shared secret (see routers/cron.py).
+    cron_secret: str = ""
+    scheduler_enabled: bool = True
+
+    # Extra browser origin allowed by CORS (e.g. the deployed frontend URL).
+    frontend_origin: str = ""
 
     class Config:
         env_file = ".env"

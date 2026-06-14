@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ friend_name }} just locked in! 🔥</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #0a0a0f;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #e2e8f0;
+      padding: 40px 16px;
+    }
+    .wrapper {
+      max-width: 560px;
+      margin: 0 auto;
+      background: linear-gradient(160deg, #12121f 0%, #0e0e1a 100%);
+      border: 1px solid rgba(251, 146, 60, 0.2);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    /* Header — Orange/fire vibe */
+    .header {
+      background: linear-gradient(135deg, #1c1207 0%, #271a09 100%);
+      border-bottom: 1px solid rgba(251, 146, 60, 0.25);
+      padding: 36px 40px 28px;
+      text-align: center;
+    }
+    .logo {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #fb923c;
+      margin-bottom: 20px;
+    }
+    .fire-icon {
+      font-size: 72px;
+      line-height: 1;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    /* Avatar circle for friend */
+    .friend-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 16px;
+      border: 3px solid rgba(251, 146, 60, 0.4);
+    }
+
+    /* Body */
+    .body {
+      padding: 40px 40px 32px;
+      text-align: center;
+    }
+    .headline {
+      font-size: 26px;
+      font-weight: 800;
+      color: #f1f5f9;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .fire { color: #fb923c; }
+    .subtext {
+      font-size: 15px;
+      color: #94a3b8;
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+
+    /* Competitive card */
+    .race-card {
+      background: rgba(251, 146, 60, 0.07);
+      border: 1px solid rgba(251, 146, 60, 0.18);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 32px;
+    }
+    .race-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .race-row:last-child { border-bottom: none; }
+    .race-avatar-small {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .race-avatar-friend { background: rgba(249, 115, 22, 0.2); color: #fb923c; border: 1.5px solid rgba(249,115,22,0.4); }
+    .race-avatar-you    { background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1.5px solid rgba(139,92,246,0.4); }
+    .race-name { font-size: 14px; color: #cbd5e1; flex: 1; text-align: left; }
+    .race-status { font-size: 13px; font-weight: 700; }
+    .status-active     { color: #fb923c; }
+    .status-waiting    { color: #64748b; }
+
+    /* CTA Button */
+    .cta-btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+      color: #ffffff !important;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 36px;
+      border-radius: 12px;
+      letter-spacing: 0.3px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(234, 88, 12, 0.35);
+    }
+
+    hr.divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin: 4px 0 20px;
+    }
+
+    .footer { padding: 20px 40px 32px; text-align: center; }
+    .footer-text { font-size: 12px; color: #334155; line-height: 1.8; }
+    .footer-text a { color: #64748b; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">LockdIN</div>
+      <span class="fire-icon">🔥</span>
+    </div>
+
+    <!-- Body -->
+    <div class="body">
+      <h1 class="headline">
+        <span class="fire">{{ friend_name }}</span> just locked in!
+      </h1>
+      <p class="subtext">
+        Your accountability partner started a focus session.<br>
+        Don't let them get ahead — lock in now.
+      </p>
+
+      <!-- Race card -->
+      <div class="race-card">
+        <div class="race-row">
+          <div class="race-avatar-small race-avatar-friend">{{ friend_initial }}</div>
+          <span class="race-name">{{ friend_name }}</span>
+          <span class="race-status status-active">🔥 Focusing</span>
+        </div>
+        <div class="race-row">
+          <div class="race-avatar-small race-avatar-you">{{ user_initial }}</div>
+          <span class="race-name">{{ user_name }} (you)</span>
+          <span class="race-status status-waiting">💤 Not started</span>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <a href="{{ dashboard_url }}" class="cta-btn">🚀 Start Your Session</a>
+
+      <hr class="divider">
+      <p class="subtext" style="font-size:13px; margin-bottom:0;">
+        Accountability works because you both show up. Now's your moment.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-text">
+        You're receiving this because you have friend session alerts enabled on LockdIN.<br>
+        <a href="{{ preferences_url }}">Manage notification preferences</a> · <a href="{{ unsubscribe_url }}">Unsubscribe</a>
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

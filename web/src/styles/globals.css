@@ -1,0 +1,187 @@
+/* =====================================================================
+   LockdIN — Design Tokens & Global Styles
+   OLED-dark canvas · single teal accent · hairline borders · teal-tinted
+   shadows · self-hosted premium type. The whole system flows from the
+   CSS variables below, which Tailwind maps into utilities (tailwind.config.js).
+   ===================================================================== */
+
+/* ---- Self-hosted fonts (no <link> to Google/Fontshare in production) ---- */
+/* Display: Clash Display (Fontshare WOFF2, vendored locally). UI/body: Geist.
+   Numerics/timers: Geist Mono with tabular figures. */
+@import "../fonts/clash-display/clash-display.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Palette / radii / shadow tokens (RGB triplets for <alpha-value>) ---- */
+:root {
+  /* Canvas: OLED-ish near-black with the faintest cool tilt. */
+  --canvas: 10 10 15; /* #0a0a0f */
+  --canvas-2: 11 11 17; /* #0b0b11 */
+
+  /* Layered elevated surfaces (translucent over canvas). */
+  --surface: 19 19 27; /* #13131b */
+  --surface-2: 23 23 32; /* #171720 */
+  --surface-3: 30 30 42; /* #1e1e2a */
+
+  /* Text ramp. */
+  --ink: 240 240 245; /* primary */
+  --ink-soft: 197 198 210; /* secondary */
+  --ink-muted: 138 139 153; /* tertiary */
+  --ink-faint: 92 93 107; /* quaternary / captions */
+
+  /* Accent — the one and only. Teal, plus a brighter variant for glows. */
+  --teal: 0 184 169; /* #00B8A9 */
+  --teal-bright: 0 212 195; /* #00d4c3 */
+  --teal-deep: 0 120 110; /* darker teal for pressed / shadow tint */
+  --teal-shadow: 0 60 56; /* shadow tint — teal-dark, never pure black */
+
+  /* Hairlines + inset highlight. */
+  --hairline: 255 255 255; /* used at 6-10% alpha */
+  --inset-top: 255 255 255; /* top inner highlight, used at 6-10% alpha */
+
+  /* Semantic status (used sparingly, kept desaturated). */
+  --danger: 239 100 100;
+  --warning: 232 168 80;
+  --success: 52 200 150;
+
+  /* Z-index scale (systemic layers only). */
+  --z-nav: 80;
+  --z-overlay: 90;
+  --z-grain: 100;
+  --z-toast: 110;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    @apply border-hairline/[0.08];
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    font-feature-settings: "ss01", "cv01";
+    min-height: 100dvh;
+  }
+
+  /* Numerics use tabular figures everywhere they appear. */
+  .tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "zero";
+  }
+
+  /* Display headings: tighten tracking on large type. */
+  .font-display {
+    letter-spacing: -0.035em;
+    font-weight: 600;
+  }
+
+  /* Visible focus ring for keyboard nav (accessibility). */
+  :focus-visible {
+    outline: 2px solid rgb(var(--teal-bright) / 0.7);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Selection in brand teal. */
+  ::selection {
+    background: rgb(var(--teal) / 0.3);
+    color: rgb(var(--ink));
+  }
+}
+
+@layer components {
+  /* ---- Custom scrollbar (refined version of the user's earlier one) ---- */
+  .scrollbar-teal {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--teal) / 0.4) transparent;
+  }
+  .scrollbar-teal::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-teal::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-teal::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      rgb(var(--teal) / 0.45),
+      rgb(var(--teal-deep) / 0.55)
+    );
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scrollbar-teal::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgb(var(--teal-bright) / 0.6),
+      rgb(var(--teal) / 0.7)
+    );
+    background-clip: padding-box;
+  }
+
+  /* Eyebrow tag base (small uppercase wide-tracking pill). */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-hairline/[0.08]
+           bg-surface/60 px-3 py-1 text-[10px] font-medium uppercase tracking-eyebrow
+           text-teal-bright backdrop-blur-sm;
+  }
+}
+
+/* ---- Global scrollbar applied to the document ---- */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--teal) / 0.35) transparent;
+}
+html::-webkit-scrollbar {
+  width: 11px;
+}
+html::-webkit-scrollbar-track {
+  background: rgb(var(--canvas));
+}
+html::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--teal) / 0.4),
+    rgb(var(--teal-deep) / 0.5)
+  );
+  border-radius: 9999px;
+  border: 2px solid rgb(var(--canvas));
+  background-clip: padding-box;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--teal-bright) / 0.55),
+    rgb(var(--teal) / 0.65)
+  );
+  background-clip: padding-box;
+}
+
+/* ---- Reduced motion: collapse all non-essential motion to instant ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

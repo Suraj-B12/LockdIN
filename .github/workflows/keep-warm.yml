@@ -1,0 +1,17 @@
+# Pings the Render backend so it doesn't cold-start on the next real request.
+# Render free sleeps after ~15 min idle (first request after is ~50s).
+# NOTE: GitHub's scheduled runs are best-effort and often delayed 5-20 min, and
+# scheduled workflows pause after 60 days of repo inactivity. For reliable
+# keep-warm, prefer a free cron-job.org monitor hitting <BACKEND_URL>/health.
+name: keep-warm
+on:
+  schedule:
+    - cron: "*/12 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          curl -fsS --max-time 90 "${{ secrets.BACKEND_URL }}/health" || true

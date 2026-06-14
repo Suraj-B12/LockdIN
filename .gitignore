@@ -21,3 +21,9 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# Local agent / editor / MCP tooling — not part of the app
+.claude/
+.agents/
+.mcp.json
+skills-lock.json

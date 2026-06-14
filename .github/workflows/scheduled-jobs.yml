@@ -1,0 +1,20 @@
+# Triggers the backend's periodic jobs (inactivity reminders, buddy-mood alerts,
+# streak warnings) via the secured cron endpoint, since the in-process scheduler
+# can't run while the free host is asleep. Requires repo secrets:
+#   BACKEND_URL  -> https://your-render-app.onrender.com
+#   CRON_SECRET  -> must match the backend's CRON_SECRET env var
+name: scheduled-jobs
+on:
+  schedule:
+    - cron: "0 8 * * *"   # 08:00 UTC — morning sweep
+    - cron: "0 18 * * *"  # 18:00 UTC — evening sweep
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run all periodic jobs
+        run: |
+          curl -fsS --max-time 180 -X POST \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.BACKEND_URL }}/api/cron/all"

@@ -1,0 +1,53 @@
+# Render Blueprint for the LockdIN FastAPI backend.
+# Deploy: Render Dashboard → New → Blueprint → connect this repo.
+# Secrets are NOT committed — set them in the Render dashboard (see DEPLOY.md).
+services:
+  - type: web
+    name: lockdin-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Use the external cron (GitHub Actions / cron-job.org) instead of the
+      # in-process scheduler, since the free instance sleeps.
+      - key: SCHEDULER_ENABLED
+        value: "false"
+      - key: ENVIRONMENT
+        value: production
+      # --- Set the rest as SECRETS in the Render dashboard (sync: false) ---
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ONESIGNAL_APP_ID
+        sync: false
+      - key: ONESIGNAL_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openai/gpt-oss-120b:free
+      - key: OPENROUTER_FALLBACK_MODEL
+        value: google/gemma-4-31b-it:free
+      - key: OPENROUTER_FALLBACK_MODEL_2
+        value: meta-llama/llama-3.3-70b-instruct:free
+      - key: JWT_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
