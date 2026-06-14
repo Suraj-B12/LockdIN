@@ -44,7 +44,6 @@ export function AccountCard() {
           <Avatar src={avatar} alt={name} size="md" fallback={initials} />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-ink">{name}</p>
-            {email && <p className="truncate text-xs text-ink-faint">{email}</p>}
           </div>
         </div>
 

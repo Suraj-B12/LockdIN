@@ -18,6 +18,7 @@ docker-compose.override.yaml
 # OS
 Thumbs.db
 .DS_Store
+__MACOSX/
 
 # Node
 node_modules/

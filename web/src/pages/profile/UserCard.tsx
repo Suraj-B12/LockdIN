@@ -93,7 +93,6 @@ export function UserCard({ profile }: UserCardProps) {
           <h2 className="truncate font-display text-2xl tracking-tightest text-ink sm:text-[28px]">
             {profile.display_name || "You"}
           </h2>
-          <p className="mt-0.5 truncate text-sm text-ink-muted">{profile.email}</p>
         </div>
       </div>
 

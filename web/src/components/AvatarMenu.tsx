@@ -70,7 +70,6 @@ export function AvatarMenu() {
               <Avatar src={avatar} alt={name} size="sm" fallback={name} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-ink">{name}</p>
-                <p className="truncate text-xs text-ink-faint">{user?.email}</p>
               </div>
             </div>
             <div className="my-1 h-px bg-hairline/[0.07]" />
