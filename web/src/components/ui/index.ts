@@ -9,6 +9,8 @@ export { Badge } from "./Badge";
 export { Input, Textarea } from "./Input";
 export { Avatar } from "./Avatar";
 export { Skeleton, SkeletonText } from "./Skeleton";
+export { Spinner, FullPageLoader } from "./Spinner";
+export type { SpinnerProps } from "./Spinner";
 export { GrainOverlay } from "./GrainOverlay";
 export { BackgroundOrbs } from "./BackgroundOrbs";
 export { FloatingNav } from "./FloatingNav";

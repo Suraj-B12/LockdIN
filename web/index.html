@@ -32,9 +32,35 @@
       name="twitter:description"
       content="Accountability you can actually see. Focus sessions, AI scores, streaks, and friend leaderboards."
     />
+    <!-- Pre-React boot splash: shown instantly (before the JS bundle + React
+         mount) so a cold load never flashes a blank page. React replaces #root's
+         contents on mount, removing it automatically. -->
+    <style>
+      @keyframes lockdin-bootspin { to { transform: rotate(360deg); } }
+      #lockdin-boot {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        background: #0a0a0f;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      #lockdin-boot .wm { font-weight: 700; font-size: 24px; letter-spacing: -0.04em; color: #f0f0f5; }
+      #lockdin-boot .wm i { color: #00b8a9; font-style: normal; }
+      #lockdin-boot .sp {
+        margin-top: 20px; width: 32px; height: 32px; border-radius: 9999px;
+        border: 3px solid rgba(255,255,255,0.12); border-top-color: #00d4c3;
+        animation: lockdin-bootspin 0.7s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) { #lockdin-boot .sp { animation-duration: 1.5s; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="lockdin-boot">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div class="wm">Lockd<i>IN</i></div>
+          <div class="sp"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

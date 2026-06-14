@@ -13,7 +13,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryProvider } from "@/lib/query-client";
 import { AuthProvider, RequireAuth } from "@/lib/auth";
-import { GrainOverlay, Toaster } from "@/components/ui";
+import { FullPageLoader, GrainOverlay, Toaster } from "@/components/ui";
 import { AppLayout } from "@/components/layouts/AppLayout";
 import { PublicLayout } from "@/components/layouts/PublicLayout";
 import { Landing } from "@/pages/Landing";
@@ -30,17 +30,9 @@ const Profile = lazy(() => import("@/pages/Profile").then((m) => ({ default: m.P
 const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
 const NotFound = lazy(() => import("@/pages/NotFound").then((m) => ({ default: m.NotFound })));
 
-/** Minimal branded fallback while a route chunk loads. */
+/** Branded full-page fallback while a lazy route chunk loads. */
 function RouteFallback() {
-  return (
-    <div className="grid min-h-[100dvh] place-items-center bg-canvas">
-      <div
-        className="h-8 w-8 animate-spin rounded-full border-2 border-hairline/10 border-t-teal"
-        role="status"
-        aria-label="Loading"
-      />
-    </div>
-  );
+  return <FullPageLoader />;
 }
 
 export default function App() {

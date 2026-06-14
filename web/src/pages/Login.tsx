@@ -5,17 +5,18 @@
 
    Auth routing mirrors the old frontend/js/login.js:
      • already signed in  → /dashboard
-     • on SIGNED_IN, NEW users (buddy still at defaults / created < 60s ago)
-       → /onboarding, returning users → /dashboard.
-   States: idle · loading (spinner in button) · error (inline + toast) ·
-   success ("Signing you in…").
+     • on SIGNED_IN, NEW users (created < 60s ago) → /onboarding,
+       returning users → /dashboard.
+   The card shows a real spinner whenever auth is in flight — clicking through
+   to Google, returning from the redirect, or the provider resolving the
+   session — so the sign-in button never flashes mid-auth.
    ===================================================================== */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ShieldCheck, Check, WarningCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { BackgroundOrbs, Card, Logo } from "@/components/ui";
+import { BackgroundOrbs, Card, Logo, Spinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { signInWithGoogle, onAuthStateChange } from "@/lib/supabase";
 import { EASE_SMOOTH, EASE_OUT } from "@/lib/motion";
@@ -64,8 +65,31 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const handledRef = useRef(false); // guard against double-routing
 
+  // We've landed back from Google's redirect (tokens/code in the URL) → a
+  // session is about to resolve, so show "signing in" immediately rather than
+  // flashing the button. False if the redirect carried an error.
+  const isOAuthReturn = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const hash = window.location.hash || "";
+    if (hash.includes("error")) return false;
+    return hash.includes("access_token") || new URLSearchParams(window.location.search).has("code");
+  }, []);
+
   useEffect(() => {
     document.title = "Sign in · LockdIN";
+  }, []);
+
+  // Surface an OAuth error handed back in the URL hash (e.g. user cancelled),
+  // then strip it so a refresh doesn't replay it.
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    if (!hash.includes("error")) return;
+    const p = new URLSearchParams(hash.replace(/^#/, ""));
+    const desc = p.get("error_description");
+    setError(
+      desc ? decodeURIComponent(desc.replace(/\+/g, " ")) : "Sign-in didn't complete. Please try again."
+    );
+    window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   /** Route a resolved session to onboarding (new) or dashboard (returning). */
@@ -108,7 +132,10 @@ export function Login() {
     }
   };
 
-  const busy = phase !== "idle";
+  // Auth in flight → show the loading state instead of the button. Suppressed
+  // when there's an error so the user can read it and retry.
+  const signingIn = !error && (phase !== "idle" || isOAuthReturn || loading);
+  const signingLabel = phase === "redirecting" ? "Connecting to Google…" : "Signing you in…";
 
   return (
     <div className="relative min-h-[100dvh] overflow-hidden bg-canvas">
@@ -140,27 +167,28 @@ export function Login() {
           <Card tone="teal">
             <div className="flex min-h-[148px] flex-col justify-center gap-5 px-1 py-3 sm:px-3">
               <AnimatePresence mode="wait" initial={false}>
-                {phase === "success" ? (
+                {signingIn ? (
                   <motion.div
-                    key="success"
+                    key="signingin"
                     className="flex flex-col items-center gap-4 py-2 text-center"
                     initial={reduce ? false : { opacity: 0, scale: 0.96 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.35, ease: EASE_OUT }}
                   >
-                    <motion.span
-                      className="grid h-12 w-12 place-items-center rounded-full bg-teal/15 text-teal-bright ring-1 ring-inset ring-teal/30"
-                      initial={reduce ? false : { scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                    >
-                      <Check weight="bold" className="h-6 w-6" />
-                    </motion.span>
-                    <div className="flex items-center gap-2.5 text-sm font-medium text-ink">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal/25 border-t-teal-bright" />
-                      Signing you in…
-                    </div>
+                    {phase === "success" ? (
+                      <motion.span
+                        className="grid h-12 w-12 place-items-center rounded-full bg-teal/15 text-teal-bright ring-1 ring-inset ring-teal/30"
+                        initial={reduce ? false : { scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 320, damping: 18 }}
+                      >
+                        <Check weight="bold" className="h-6 w-6" />
+                      </motion.span>
+                    ) : (
+                      <Spinner size="xl" />
+                    )}
+                    <p className="text-sm font-medium text-ink">{signingLabel}</p>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -174,31 +202,24 @@ export function Login() {
                     <button
                       type="button"
                       onClick={handleGoogle}
-                      disabled={busy}
-                      aria-busy={busy}
                       className={cn(
                         "group flex h-12 w-full items-center justify-center gap-3 rounded-full",
                         "bg-ink text-canvas text-[15px] font-medium shadow-pill",
                         "transition-[transform,opacity,box-shadow] duration-200 ease-out-strong",
                         "hover:opacity-95 hover:shadow-[0_1px_0_0_rgba(255,255,255,0.12)_inset,0_12px_30px_-10px_rgba(0,0,0,0.7)]",
                         "active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2",
-                        "focus-visible:ring-teal-bright/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2",
-                        "disabled:pointer-events-none disabled:opacity-60"
+                        "focus-visible:ring-teal-bright/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2"
                       )}
                     >
                       <span className="grid h-6 w-6 place-items-center">
-                        {phase === "redirecting" ? (
-                          <span className="h-5 w-5 animate-spin rounded-full border-2 border-canvas/25 border-t-canvas" />
-                        ) : (
-                          <GoogleMark className="h-5 w-5" />
-                        )}
+                        <GoogleMark className="h-5 w-5" />
                       </span>
-                      {phase === "redirecting" ? "Connecting…" : "Continue with Google"}
+                      Continue with Google
                     </button>
 
                     {error ? (
                       <motion.p
-                        className="flex items-center justify-center gap-2 text-xs text-danger"
+                        className="flex items-center justify-center gap-2 text-center text-xs text-danger"
                         role="alert"
                         initial={reduce ? false : { opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}

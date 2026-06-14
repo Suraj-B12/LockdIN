@@ -13,7 +13,8 @@ import {
 import { Navigate, useLocation } from "react-router-dom";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSession, onAuthStateChange, signOut as sbSignOut } from "./supabase";
-import { initOneSignal, identify, clearIdentity } from "./onesignal";
+import { initOneSignal, identify, clearIdentity, promptPush, pushPermission } from "./onesignal";
+import { FullPageLoader } from "@/components/ui/Spinner";
 
 interface AuthContextValue {
   session: Session | null;
@@ -57,7 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // backend's external_id-targeted pushes reach this browser. Fire-and-forget.
   const userId = session?.user?.id ?? null;
   useEffect(() => {
-    if (userId) void identify(userId);
+    if (!userId) return;
+    // Sync OneSignal's external_id so backend pushes reach this browser.
+    void identify(userId);
+    // Prompt for push permission right after sign-in (the ask: notifications
+    // pop up on each login/signup). The native prompt only appears while
+    // permission is still "default" — a no-op once granted or denied, so it
+    // never nags. Small delay lets the first screen paint first.
+    const t = window.setTimeout(() => {
+      if (pushPermission() !== "granted") void promptPush();
+    }, 1800);
+    return () => window.clearTimeout(t);
   }, [userId]);
 
   const value = useMemo<AuthContextValue>(
@@ -96,15 +107,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="grid min-h-[100dvh] place-items-center bg-canvas">
-        <div
-          className="h-8 w-8 animate-spin rounded-full border-2 border-hairline/10 border-t-teal"
-          role="status"
-          aria-label="Loading"
-        />
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   if (!session) {
