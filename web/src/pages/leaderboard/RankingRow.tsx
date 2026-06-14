@@ -4,6 +4,7 @@
    gold/silver/bronze rank coins with a tinted hairline and a faint top sheen.
    The viewer's own row is highlighted teal regardless of position.
    ===================================================================== */
+import { Link } from "react-router-dom";
 import { Crown, type Icon } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -69,31 +70,37 @@ export function RankingRow({ entry, isYou }: RankingRowProps) {
         </span>
       </div>
 
-      {/* Avatar. */}
-      <Avatar
-        src={entry.avatar_url}
-        alt={entry.display_name}
-        fallback={entry.display_name}
-        size="sm"
-        glow={rank === 1}
-      />
+      {/* Avatar + name → that person's profile. */}
+      <Link
+        to={`/u/${entry.user_id}`}
+        aria-label={`View ${entry.display_name}'s profile`}
+        className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-bright/60 sm:gap-4"
+      >
+        <Avatar
+          src={entry.avatar_url}
+          alt={entry.display_name}
+          fallback={entry.display_name}
+          size="sm"
+          glow={rank === 1}
+        />
 
-      {/* Name + focus time. */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-ink">
-            {entry.display_name}
-          </span>
-          {isYou && (
-            <span className="shrink-0 rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-medium text-teal-bright ring-1 ring-inset ring-teal/25">
-              You
+        {/* Name + focus time. */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium text-ink transition-colors group-hover:text-teal-bright">
+              {entry.display_name}
             </span>
-          )}
+            {isYou && (
+              <span className="shrink-0 rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-medium text-teal-bright ring-1 ring-inset ring-teal/25">
+                You
+              </span>
+            )}
+          </div>
+          <div className="font-mono text-[11px] text-ink-faint tabular">
+            {formatFocus(entry.total_seconds)} focused
+          </div>
         </div>
-        <div className="font-mono text-[11px] text-ink-faint tabular">
-          {formatFocus(entry.total_seconds)} focused
-        </div>
-      </div>
+      </Link>
 
       {/* Score (mono, tabular). */}
       <div className="shrink-0 text-right">

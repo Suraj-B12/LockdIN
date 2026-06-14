@@ -45,9 +45,13 @@ export function ActivityHeatmap({ model }: { model: HeatmapModel }) {
       </div>
 
       {/* The grid scrolls horizontally on narrow screens; the tooltip is
-          positioned relative to this scroll container. */}
-      <div className="scrollbar-teal relative overflow-x-auto pb-1">
-        <div className="relative inline-flex gap-[6px] pt-5">
+          positioned relative to this scroll container. pt-6 reserves room for
+          the month labels INSIDE the scrollport — overflow-x-auto forces
+          overflow-y to auto, so anything flush with the top edge (the labels,
+          and with it the first cell row) gets clipped; the padding keeps them
+          safely inside. */}
+      <div className="scrollbar-teal relative overflow-x-auto pb-1 pt-6">
+        <div className="relative inline-flex gap-[6px]">
           {/* Weekday labels column (offset down past the month-label row). */}
           <div className="mr-1 flex shrink-0 flex-col gap-[6px]">
             {WEEKDAY_ROWS.map((label, r) => (

@@ -76,21 +76,27 @@ export function LeaderboardCard() {
                     >
                       {e.rank}
                     </span>
-                    <Avatar
-                      src={e.avatar_url}
-                      alt={e.display_name}
-                      size="sm"
-                      fallback={e.display_name}
-                      glow={you}
-                    />
-                    <span
-                      className={cn(
-                        "min-w-0 flex-1 truncate text-sm font-medium",
-                        you ? "text-ink" : "text-ink-soft"
-                      )}
+                    <Link
+                      to={`/u/${e.user_id}`}
+                      aria-label={`View ${e.display_name}'s profile`}
+                      className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-bright/60"
                     >
-                      {you ? "You" : e.display_name}
-                    </span>
+                      <Avatar
+                        src={e.avatar_url}
+                        alt={e.display_name}
+                        size="sm"
+                        fallback={e.display_name}
+                        glow={you}
+                      />
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate text-sm font-medium transition-colors",
+                          you ? "text-ink" : "text-ink-soft group-hover:text-teal-bright"
+                        )}
+                      >
+                        {you ? "You" : e.display_name}
+                      </span>
+                    </Link>
                     <span className="shrink-0 font-mono text-sm font-semibold tabular text-ink">
                       {e.total_score}
                     </span>
