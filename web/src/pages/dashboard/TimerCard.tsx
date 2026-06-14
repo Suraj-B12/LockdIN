@@ -22,6 +22,7 @@ import type { SessionResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { formatClock, formatDuration, scoreToneClass } from "./utils";
 import { WorkLogSheet } from "./WorkLogSheet";
+import { celebrate } from "@/lib/celebrate";
 
 /** Seconds the ring loops over — a visual "sweep", not a hard goal (60 min). */
 const RING_PERIOD = 3600;
@@ -43,6 +44,9 @@ export function TimerCard() {
   const finish = useFinishSession();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Elapsed time FROZEN at the instant Finish is clicked — the log sheet shows
+  // this, not the still-running live timer, so the duration stops climbing.
+  const [frozenSeconds, setFrozenSeconds] = useState(0);
   // Whole-second display value. Derived from wall-clock each frame while active.
   const [displaySeconds, setDisplaySeconds] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -133,14 +137,23 @@ export function TimerCard() {
     });
   }
 
+  // Snapshot elapsed time when Finish is pressed, then open the log sheet. The
+  // session stays active until submit, but the shown duration freezes here.
+  function openFinish() {
+    if (!session) return;
+    setFrozenSeconds(isActive ? Math.floor(liveElapsed(session)) : Math.floor(session.total_seconds));
+    setSheetOpen(true);
+  }
+
   function handleFinishSubmit(workLog: string) {
     if (!session) return;
-    const loggedSeconds = isActive ? Math.floor(liveElapsed(session)) : session.total_seconds;
+    const loggedSeconds = frozenSeconds;
     finish.mutate(
       { id: session.id, body: { work_log: workLog } },
       {
         onSuccess: (finished) => {
           setSheetOpen(false);
+          celebrate(); // confetti burst + success chime
           const score = finished.ai_score;
           const cls = typeof score === "number" ? scoreToneClass(score) : "text-teal-bright";
           toast.success(
@@ -257,7 +270,7 @@ export function TimerCard() {
                 size="lg"
                 variant="outline"
                 leadingIcon={Flag}
-                onClick={() => setSheetOpen(true)}
+                onClick={openFinish}
                 disabled={busy}
               >
                 Finish
@@ -280,7 +293,7 @@ export function TimerCard() {
                 size="lg"
                 variant="outline"
                 leadingIcon={Flag}
-                onClick={() => setSheetOpen(true)}
+                onClick={openFinish}
                 disabled={busy}
               >
                 Finish
@@ -292,7 +305,7 @@ export function TimerCard() {
 
       <WorkLogSheet
         open={sheetOpen}
-        elapsedSeconds={displaySeconds}
+        elapsedSeconds={frozenSeconds}
         submitting={finish.isPending}
         onCancel={() => {
           if (!finish.isPending) setSheetOpen(false);

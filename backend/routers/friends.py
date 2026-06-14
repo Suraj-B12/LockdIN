@@ -74,6 +74,27 @@ async def list_pending_requests(user: dict = Depends(get_current_user)):
     return friends
 
 
+@router.get("/sent", response_model=list[FriendResponse])
+async def list_sent_requests(user: dict = Depends(get_current_user)):
+    """List outgoing friend requests the current user has sent and are still pending."""
+    db = get_supabase()
+
+    result = db.table("friendships") \
+        .select("*, profiles!friendships_friend_id_fkey(display_name, avatar_url)") \
+        .eq("user_id", user["id"]) \
+        .eq("status", "pending") \
+        .execute()
+
+    friends = []
+    for row in result.data:
+        profile = row.pop("profiles", {}) or {}
+        row["friend_name"] = profile.get("display_name")
+        row["friend_avatar"] = profile.get("avatar_url")
+        friends.append(row)
+
+    return friends
+
+
 @router.post("/request", response_model=FriendResponse)
 async def send_friend_request(body: FriendRequest, user: dict = Depends(get_current_user)):
     """Send a friend request via invite code or email."""

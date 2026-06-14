@@ -1,50 +1,64 @@
 /* =====================================================================
-   PendingCard — incoming friend requests waiting on you. Accept / Decline
-   each via useRespondToFriend (action: accept | reject). The card hides itself
-   entirely when there's nothing pending, so it never adds empty noise.
+   RequestsCard — incoming friend requests waiting on you, rendered as a bare
+   list for use inside the FriendsHub tabs (no Card chrome of its own).
+   Accept / Decline via useRespondToFriend. Loading shows shape-matched
+   skeletons; empty state is a calm "nothing waiting"; error offers a retry.
    ===================================================================== */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, X, UserPlus } from "@phosphor-icons/react";
+import { Check, UserPlus, WarningCircle, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { Card, Avatar } from "@/components/ui";
+import { Avatar, Button } from "@/components/ui";
 import { usePendingFriends, useRespondToFriend } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
 import type { FriendResponse, FriendAction } from "@/lib/types";
 import { EASE_OUT } from "@/lib/motion";
+import { FriendRowsSkeleton } from "./skeletons";
 
-export function PendingCard() {
-  const { data: pending, isLoading } = usePendingFriends();
+export function RequestsCard() {
+  const { data: pending, isLoading, isError, refetch, isFetching } = usePendingFriends();
 
-  // Quietly absent while loading or when empty — pending is an exception state.
-  if (isLoading || !pending || pending.length === 0) return null;
+  if (isLoading) return <FriendRowsSkeleton rows={2} />;
 
-  return (
-    <Card tone="elevated" bodyClassName="p-6 sm:p-7">
-      <div className="flex items-center gap-2.5">
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-teal/12 text-teal-bright ring-1 ring-inset ring-teal/25">
-          <UserPlus weight="fill" className="h-4 w-4" />
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface-2/40 px-4 py-8 text-center ring-1 ring-inset ring-hairline/[0.07]">
+        <WarningCircle weight="duotone" className="h-7 w-7 text-warning" />
+        <p className="text-sm text-ink-soft">We couldn't load your requests.</p>
+        <Button variant="secondary" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? "Retrying…" : "Try again"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (!pending || pending.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-2xl bg-surface-2/40 px-5 py-9 text-center ring-1 ring-inset ring-hairline/[0.07]">
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-surface-3 text-ink-soft ring-1 ring-inset ring-hairline/10">
+          <UserPlus weight="duotone" className="h-6 w-6" />
         </span>
         <div>
-          <h3 className="font-display text-lg tracking-tight text-ink">Friend requests</h3>
-          <p className="text-xs text-ink-muted">
-            {pending.length} {pending.length === 1 ? "person wants" : "people want"} to lock in with
-            you.
+          <p className="text-sm font-medium text-ink">No incoming requests</p>
+          <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-ink-muted">
+            When someone asks to lock in with you, their request lands here.
           </p>
         </div>
       </div>
+    );
+  }
 
-      <ul className="mt-5 flex flex-col gap-2">
-        <AnimatePresence initial={false}>
-          {pending.map((req) => (
-            <PendingRow key={req.id} req={req} />
-          ))}
-        </AnimatePresence>
-      </ul>
-    </Card>
+  return (
+    <ul className="flex flex-col gap-2">
+      <AnimatePresence initial={false}>
+        {pending.map((req) => (
+          <RequestRow key={req.id} req={req} />
+        ))}
+      </AnimatePresence>
+    </ul>
   );
 }
 
-function PendingRow({ req }: { req: FriendResponse }) {
+function RequestRow({ req }: { req: FriendResponse }) {
   const reduce = useReducedMotion();
   const respond = useRespondToFriend();
   const name = req.friend_name || "Someone";

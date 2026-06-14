@@ -36,6 +36,7 @@ export const qk = {
   leaderboard: (period: LeaderboardPeriod) => ["leaderboard", period] as const,
   friends: ["friends", "list"] as const,
   friendsPending: ["friends", "pending"] as const,
+  friendsSent: ["friends", "sent"] as const,
   notificationPrefs: ["notifications", "preferences"] as const,
   me: ["users", "me"] as const,
   authMe: ["auth", "me"] as const,
@@ -177,6 +178,14 @@ export function usePendingFriends() {
   });
 }
 
+/** GET /friends/sent → FriendResponse[] (outgoing requests still pending). */
+export function useSentRequests() {
+  return useQuery({
+    queryKey: qk.friendsSent,
+    queryFn: ({ signal }) => api.get<FriendResponse[]>("/friends/sent", { signal }),
+  });
+}
+
 /** POST /friends/request {invite_code?|email?} → FriendResponse (idempotent). */
 export function useSendFriendRequest() {
   const qc = useQueryClient();
@@ -185,6 +194,7 @@ export function useSendFriendRequest() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.friends });
       qc.invalidateQueries({ queryKey: qk.friendsPending });
+      qc.invalidateQueries({ queryKey: qk.friendsSent });
     },
   });
 }
@@ -198,6 +208,7 @@ export function useRespondToFriend() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.friends });
       qc.invalidateQueries({ queryKey: qk.friendsPending });
+      qc.invalidateQueries({ queryKey: qk.friendsSent });
     },
   });
 }
@@ -210,6 +221,7 @@ export function useRemoveFriend() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.friends });
       qc.invalidateQueries({ queryKey: qk.friendsPending });
+      qc.invalidateQueries({ queryKey: qk.friendsSent });
     },
   });
 }

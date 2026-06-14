@@ -3,18 +3,16 @@
    Composition (renders inside AppLayout):
      • UserCard      identity + invite code + the headline ADD FRIEND action
      • BuddyCard     current mood + the full ten-frame mood gallery
-     • PendingCard   incoming requests (self-hides when none)
-     • FriendsCard   accepted friends with Nudge / Remove
+     • FriendsHub    tabbed friends area — Friends | Requests | Sent
    The whole screen is privacy-framed: encouragement, never comparison.
    Hooks: useProfile, useBuddy, useSendFriendRequest, useFriends, useNudgeFriend,
-   useRemoveFriend, usePendingFriends, useRespondToFriend.
+   useRemoveFriend, usePendingFriends, useSentRequests, useRespondToFriend.
    ===================================================================== */
 import { Card, EyebrowTag, Reveal, RevealChild, Skeleton } from "@/components/ui";
-import { useProfile, useBuddy, usePendingFriends } from "@/lib/queries";
+import { useProfile, useBuddy } from "@/lib/queries";
 import { UserCard } from "./profile/UserCard";
 import { BuddyCard } from "./profile/BuddyCard";
-import { FriendsCard } from "./profile/FriendsCard";
-import { PendingCard } from "./profile/PendingCard";
+import { FriendsHub } from "./profile/FriendsHub";
 import { ProfileSkeleton, ProfileLoadError } from "./profile/skeletons";
 
 export function Profile() {
@@ -27,11 +25,6 @@ export function Profile() {
   } = useProfile();
 
   const { data: buddy, isLoading: buddyLoading, isError: buddyError } = useBuddy();
-
-  // Read pending here too (shared cache key — free) so we can omit the slot
-  // entirely when there's nothing pending, avoiding an empty gap in the stack.
-  const { data: pending } = usePendingFriends();
-  const hasPending = !!pending && pending.length > 0;
 
   return (
     <div className="mx-auto w-full max-w-[1180px]">
@@ -68,16 +61,9 @@ export function Profile() {
             </div>
           </RevealChild>
 
-          {/* Pending requests — only occupy a slot when there's something to show. */}
-          {hasPending && (
-            <RevealChild>
-              <PendingCard />
-            </RevealChild>
-          )}
-
-          {/* Friends list. */}
+          {/* Friends area — tabbed: Friends | Requests | Sent. */}
           <RevealChild>
-            <FriendsCard selfId={profile.id} inviteCode={profile.invite_code} />
+            <FriendsHub selfId={profile.id} inviteCode={profile.invite_code} />
           </RevealChild>
         </Reveal>
       )}

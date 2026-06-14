@@ -222,11 +222,11 @@ export function Login() {
           <div className="mt-8 flex flex-col items-center gap-4">
             <p className="text-center text-xs leading-relaxed text-ink-faint">
               By continuing you agree to our{" "}
-              <Link to="/" className="text-ink-muted underline-offset-2 transition-colors hover:text-ink hover:underline">
+              <Link to="/terms" className="text-ink-muted underline-offset-2 transition-colors hover:text-ink hover:underline">
                 terms
               </Link>{" "}
               and{" "}
-              <Link to="/" className="text-ink-muted underline-offset-2 transition-colors hover:text-ink hover:underline">
+              <Link to="/privacy" className="text-ink-muted underline-offset-2 transition-colors hover:text-ink hover:underline">
                 privacy policy
               </Link>
               .
