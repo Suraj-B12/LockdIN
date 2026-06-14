@@ -96,6 +96,21 @@ class BuddyUpdate(BaseModel):
     buddy_name: Optional[str] = Field(None, min_length=1, max_length=30)
 
 
+# ========== FRIEND PROFILE (consolidated public view) ==========
+
+class FriendProfileResponse(BaseModel):
+    """A friend's full public profile in one payload: identity + buddy + finished
+    session history (the client derives the activity heatmap, stats, and feed
+    from `sessions`). REDACTED — never carries email or invite_code."""
+    id: UUID
+    display_name: str
+    avatar_url: Optional[str] = None
+    created_at: datetime
+    last_active_at: datetime
+    buddy: Optional[BuddyResponse] = None
+    sessions: list[SessionResponse] = Field(default_factory=list)
+
+
 # ========== FRIENDS ==========
 
 class FriendRequest(BaseModel):

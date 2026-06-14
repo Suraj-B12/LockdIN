@@ -10,6 +10,7 @@
        is not the current user's.
    ===================================================================== */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Hand, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -76,24 +77,32 @@ export function FriendRow({ friend, selfId }: FriendRowProps) {
 
   return (
     <li className="flex items-center gap-3 rounded-2xl bg-surface-2/50 px-3 py-2.5 ring-1 ring-inset ring-hairline/[0.07] transition-colors duration-200 hover:bg-surface-2/80 sm:px-4">
-      <Avatar src={friend.friend_avatar} alt={name} size="md" fallback={initials} />
+      <Link
+        to={`/u/${friendUserId}`}
+        aria-label={`View ${name}'s profile`}
+        className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-bright/60"
+      >
+        <Avatar src={friend.friend_avatar} alt={name} size="md" fallback={initials} />
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink">{name}</p>
-        <p className="truncate text-xs text-ink-faint">
-          {streak != null || score != null ? (
-            <span className="inline-flex items-center gap-2 tabular">
-              {streak != null && <span>{streak}-day streak</span>}
-              {streak != null && score != null && (
-                <span className="text-ink-faint/60">·</span>
-              )}
-              {score != null && <span>{score} pts</span>}
-            </span>
-          ) : (
-            "Locked in with you"
-          )}
-        </p>
-      </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-ink transition-colors group-hover:text-teal-bright">
+            {name}
+          </p>
+          <p className="truncate text-xs text-ink-faint">
+            {streak != null || score != null ? (
+              <span className="inline-flex items-center gap-2 tabular">
+                {streak != null && <span>{streak}-day streak</span>}
+                {streak != null && score != null && (
+                  <span className="text-ink-faint/60">·</span>
+                )}
+                {score != null && <span>{score} pts</span>}
+              </span>
+            ) : (
+              "Locked in with you"
+            )}
+          </p>
+        </div>
+      </Link>
 
       <AnimatePresence mode="wait" initial={false}>
         {confirming ? (

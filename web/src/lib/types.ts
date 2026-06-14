@@ -128,6 +128,17 @@ export interface ProfileUpdate {
   avatar_url?: string;
 }
 
+/* ---- Friend profile (consolidated public view; redacted — no email/invite) ---- */
+export interface FriendProfileResponse {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  created_at: string;
+  last_active_at: string;
+  buddy: BuddyResponse | null;
+  sessions: SessionResponse[];
+}
+
 /* ---- Auth ---- */
 export interface AuthMeResponse {
   id: string;

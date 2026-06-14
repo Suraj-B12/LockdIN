@@ -25,6 +25,7 @@ import type {
   ProfileResponse,
   ProfileUpdate,
   AuthMeResponse,
+  FriendProfileResponse,
 } from "./types";
 
 /* ---- Query keys (stable, centralized) ---- */
@@ -39,6 +40,7 @@ export const qk = {
   friendsSent: ["friends", "sent"] as const,
   notificationPrefs: ["notifications", "preferences"] as const,
   me: ["users", "me"] as const,
+  userOverview: (userId: string) => ["users", "overview", userId] as const,
   authMe: ["auth", "me"] as const,
 };
 
@@ -266,6 +268,19 @@ export function useProfile(options?: Partial<UseQueryOptions<ProfileResponse>>) 
     queryKey: qk.me,
     queryFn: ({ signal }) => api.get<ProfileResponse>("/users/me", { signal }),
     ...options,
+  });
+}
+
+/**
+ * GET /users/{userId}/overview → FriendProfileResponse (self or an accepted
+ * friend; 404 otherwise). Powers the friend-profile screen in one round-trip.
+ */
+export function useUserOverview(userId: string | undefined) {
+  return useQuery({
+    queryKey: qk.userOverview(userId ?? ""),
+    queryFn: ({ signal }) =>
+      api.get<FriendProfileResponse>(`/users/${userId}/overview`, { signal }),
+    enabled: !!userId,
   });
 }
 

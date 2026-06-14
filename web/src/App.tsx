@@ -27,6 +27,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard").then((m) => ({ default:
 const Leaderboard = lazy(() => import("@/pages/Leaderboard").then((m) => ({ default: m.Leaderboard })));
 const History = lazy(() => import("@/pages/History").then((m) => ({ default: m.History })));
 const Profile = lazy(() => import("@/pages/Profile").then((m) => ({ default: m.Profile })));
+const FriendProfile = lazy(() => import("@/pages/FriendProfile").then((m) => ({ default: m.FriendProfile })));
 const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
 const NotFound = lazy(() => import("@/pages/NotFound").then((m) => ({ default: m.NotFound })));
 
@@ -65,6 +66,7 @@ export default function App() {
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/u/:userId" element={<FriendProfile />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
 
