@@ -2,9 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "comment": "Proxy API calls to the Render backend (same-origin from the browser, no CORS). REPLACE the host with your Render URL.",
+      "comment": "Proxy API calls to the Render backend (same-origin from the browser, no CORS).",
       "source": "/api/:path*",
-      "destination": "https://lockdin-api.onrender.com/api/:path*"
+      "destination": "https://lockdin-api-a8vx.onrender.com/api/:path*"
     },
     {
       "comment": "SPA fallback — every non-file, non-API route serves index.html so client routing works.",
