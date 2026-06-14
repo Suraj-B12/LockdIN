@@ -64,7 +64,7 @@ export function Privacy() {
           </LI>
           <LI>
             <Term>Contact / Data Protection &amp; Grievance Officer:</Term>{" "}
-            <A href="mailto:capstoneysl@gmail.com">capstoneysl@gmail.com</A>{" "}
+            <A href="mailto:support@lockdin.app">support@lockdin.app</A>{" "}
             (<Placeholder>DPO / Grievance Officer name, if appointed</Placeholder>)
           </LI>
         </UL>
@@ -373,7 +373,7 @@ export function Privacy() {
 
         <H3>How to exercise your rights</H3>
         <P>
-          Email <A href="mailto:capstoneysl@gmail.com">capstoneysl@gmail.com</A> from the address tied
+          Email <A href="mailto:support@lockdin.app">support@lockdin.app</A> from the address tied
           to your account, or use the in-app settings where available. We may need to verify your
           identity first. We&rsquo;ll respond within the timeframe required by the applicable law
           (generally within one month under the GDPR), and we won&rsquo;t charge you unless a request
@@ -442,7 +442,7 @@ export function Privacy() {
       <Sec id="contact" title="13. Contact us">
         <P>
           Questions, requests, or grievances about your privacy? Email us at{" "}
-          <A href="mailto:capstoneysl@gmail.com">capstoneysl@gmail.com</A>. For formal notices, write
+          <A href="mailto:support@lockdin.app">support@lockdin.app</A>. For formal notices, write
           to <Placeholder>Legal entity name</Placeholder>, <Placeholder>Registered address</Placeholder>.
         </P>
       </Sec>

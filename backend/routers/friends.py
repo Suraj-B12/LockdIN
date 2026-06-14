@@ -218,8 +218,7 @@ async def respond_to_request(
     if not friendship.data:
         raise HTTPException(status_code=404, detail="Pending request not found.")
 
-    new_status = body.action
-    if new_status == "reject":
+    if body.action == "reject":
         # Delete the friendship entirely. Echo the row back with a "rejected"
         # status so the client sees the resolved state (the row no longer exists).
         db.table("friendships").delete().eq("id", friendship_id).execute()
@@ -227,6 +226,10 @@ async def respond_to_request(
         rejected["status"] = "rejected"
         return rejected
 
+    # Map the action VERB to the DB status VALUE. The friendships.status CHECK
+    # constraint allows only 'pending' / 'accepted' / 'blocked' — writing the raw
+    # verb "accept" violates the constraint (this was the 500 on Accept).
+    new_status = "accepted" if body.action == "accept" else "blocked"
     result = db.table("friendships") \
         .update({"status": new_status}) \
         .eq("id", friendship_id) \

@@ -1,14 +1,17 @@
 /* =====================================================================
-   celebrate() — fun feedback when a focus session is completed: a confetti
-   burst + a short, bright "success" chime. Fully guarded (never throws into
-   the finish flow) and respects prefers-reduced-motion for the confetti.
+   celebrate() — fun feedback when a focus session is completed: a full-screen
+   confetti blast (rendered on canvas-confetti's own fixed, body-level canvas, so
+   it overlays whatever screen you're on) + a short bright "success" chime.
+   Both are fully guarded and never throw into the finish flow.
    ===================================================================== */
 import confetti from "canvas-confetti";
 
 /** A short ascending major arpeggio (C5–E5–G5–C6) via Web Audio — no asset. */
 function playChime() {
   try {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     const ctx = new AC();
     const now = ctx.currentTime;
@@ -32,20 +35,28 @@ function playChime() {
   }
 }
 
-/** Teal-brand confetti: a center pop + two side cannons. */
+/** Teal-brand confetti blast. zIndex sits above every app layer (nav 80, overlay
+ *  90, grain 100, toast 110) so it's always visible. NOT gated on reduced-motion
+ *  — the user wants the celebration to always fire. */
 function fireConfetti() {
   try {
-    const colors = ["#00B8A9", "#00d4c3", "#5eead4", "#f0f0f5"];
-    const base = { colors, disableForReducedMotion: true, zIndex: 200 };
-    confetti({ ...base, particleCount: 90, spread: 75, startVelocity: 48, origin: { x: 0.5, y: 0.62 } });
-    confetti({ ...base, particleCount: 50, angle: 60, spread: 62, origin: { x: 0, y: 0.7 } });
-    confetti({ ...base, particleCount: 50, angle: 120, spread: 62, origin: { x: 1, y: 0.7 } });
-  } catch {
-    /* confetti unavailable — ignore */
+    const colors = ["#00B8A9", "#00d4c3", "#5eead4", "#f0f0f5", "#ffffff"];
+    const Z = 9999;
+    // Center pop.
+    confetti({ colors, zIndex: Z, particleCount: 130, spread: 95, startVelocity: 52, origin: { x: 0.5, y: 0.6 }, scalar: 1.1, ticks: 220 });
+    // Two side cannons.
+    confetti({ colors, zIndex: Z, particleCount: 60, angle: 60, spread: 70, startVelocity: 55, origin: { x: 0, y: 0.7 } });
+    confetti({ colors, zIndex: Z, particleCount: 60, angle: 120, spread: 70, startVelocity: 55, origin: { x: 1, y: 0.7 } });
+    // A fuller second wave a beat later for a real "blast".
+    window.setTimeout(() => {
+      confetti({ colors, zIndex: Z, particleCount: 90, spread: 110, startVelocity: 42, decay: 0.92, origin: { x: 0.5, y: 0.45 }, scalar: 0.95 });
+    }, 220);
+  } catch (err) {
+    console.warn("[celebrate] confetti failed:", err);
   }
 }
 
-/** Celebrate a completed session. Safe to call from any event handler. */
+/** Celebrate a completed session. Safe to call from any event handler / any screen. */
 export function celebrate(): void {
   fireConfetti();
   playChime();

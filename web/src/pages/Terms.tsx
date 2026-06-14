@@ -69,7 +69,7 @@ export function Terms() {
             Don&rsquo;t share your account or let others use it, and don&rsquo;t impersonate anyone.
           </LI>
           <LI>
-            Tell us promptly at <A href="mailto:capstoneysl@gmail.com">capstoneysl@gmail.com</A> if you
+            Tell us promptly at <A href="mailto:support@lockdin.app">support@lockdin.app</A> if you
             suspect unauthorised use of your account.
           </LI>
           <LI>You&rsquo;re responsible for any devices and connections you use to access LockdIN.</LI>
@@ -225,7 +225,7 @@ export function Terms() {
       <Sec id="contact" title="12. Contact us">
         <P>
           Questions about these Terms? Email{" "}
-          <A href="mailto:capstoneysl@gmail.com">capstoneysl@gmail.com</A>. For formal notices, write to{" "}
+          <A href="mailto:support@lockdin.app">support@lockdin.app</A>. For formal notices, write to{" "}
           <Placeholder>Legal entity name</Placeholder>, <Placeholder>Registered address</Placeholder>.
         </P>
       </Sec>
