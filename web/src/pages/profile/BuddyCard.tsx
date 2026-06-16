@@ -5,12 +5,20 @@
    compares you to anyone.
    ===================================================================== */
 import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Flame, PencilSimple, Check, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui";
+import { BuddySpeechBubble } from "@/components/BuddySpeechBubble";
 import { useUpdateBuddy } from "@/lib/queries";
 import { getBuddyAvatar, moodLabel, moodEmoji, MOOD_MIN, MOOD_MAX } from "@/lib/buddy";
+import {
+  pickBuddyLine,
+  speakLine,
+  isBuddyMuted,
+  setBuddyMuted,
+  type BuddyState,
+} from "@/lib/buddySpeech";
 import type { BuddyResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
 
@@ -26,6 +34,37 @@ const ALL_MOODS = Array.from({ length: MOOD_MAX - MOOD_MIN + 1 }, (_, i) => i + 
 export function BuddyCard({ buddy }: BuddyCardProps) {
   const reduce = useReducedMotion();
   const mood = buddy.mood_level;
+
+  // ---- Talking buddy: tap (or hover) the avatar for a motivational line ----
+  const [line, setLine] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+  const [muted, setMutedState] = useState(() => isBuddyMuted());
+
+  const buddyState: BuddyState = {
+    buddyName: buddy.buddy_name,
+    moodLevel: buddy.mood_level,
+    currentStreak: buddy.current_streak,
+    longestStreak: buddy.longest_streak,
+  };
+
+  const say = (speak: boolean) => {
+    const next = pickBuddyLine(buddyState);
+    setLine(next);
+    setNonce((n) => n + 1);
+    if (speak) speakLine(next);
+  };
+  const talk = () => say(true); // click → spoken
+  const peek = () => {
+    if (!line) say(false); // hover → silent, don't interrupt an active line
+  };
+  const replay = () => {
+    if (line) speakLine(line);
+  };
+  const toggleMute = () => {
+    const m = !muted;
+    setMutedState(m);
+    setBuddyMuted(m);
+  };
 
   return (
     <Card tone="teal" bodyClassName="p-6 sm:p-7">
@@ -44,17 +83,44 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
 
       {/* Current buddy */}
       <div className="mt-5 flex items-center gap-5">
-        <div className="relative grid h-28 w-28 shrink-0 place-items-center rounded-full bg-surface-2/50 ring-1 ring-inset ring-hairline/10">
-          <motion.img
-            key={`${buddy.buddy_type}-${mood}`}
-            src={getBuddyAvatar(buddy.buddy_type, mood)}
-            alt={`${buddy.buddy_name} feeling ${moodLabel(mood).toLowerCase()}`}
-            className="relative h-24 w-24 select-none object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.45)]"
-            initial={reduce ? false : { opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.45, ease: EASE_SMOOTH }}
-            draggable={false}
-          />
+        <div className="relative shrink-0">
+          {/* Speech bubble floats above the avatar */}
+          <AnimatePresence>
+            {line && (
+              <div className="absolute bottom-full left-0 z-30 mb-3">
+                <BuddySpeechBubble
+                  text={line}
+                  nonce={nonce}
+                  muted={muted}
+                  onReplay={replay}
+                  onToggleMute={toggleMute}
+                  onDismiss={() => setLine(null)}
+                />
+              </div>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="button"
+            onClick={talk}
+            onMouseEnter={peek}
+            aria-label={`Talk to ${buddy.buddy_name || "your buddy"}`}
+            className="group/buddy relative grid h-28 w-28 place-items-center rounded-full bg-surface-2/50 ring-1 ring-inset ring-hairline/10 transition-transform duration-300 ease-out-strong hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55"
+          >
+            <motion.img
+              key={`${buddy.buddy_type}-${mood}`}
+              src={getBuddyAvatar(buddy.buddy_type, mood)}
+              alt={`${buddy.buddy_name} feeling ${moodLabel(mood).toLowerCase()}`}
+              className="relative h-24 w-24 select-none object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.45)]"
+              initial={reduce ? false : { opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.45, ease: EASE_SMOOTH }}
+              draggable={false}
+            />
+            <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-surface-3/85 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-ink-faint opacity-0 ring-1 ring-inset ring-hairline/10 transition-opacity duration-300 group-hover/buddy:opacity-100">
+              Tap to talk
+            </span>
+          </button>
         </div>
 
         <div className="min-w-0">
