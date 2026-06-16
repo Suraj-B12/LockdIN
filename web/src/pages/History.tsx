@@ -6,18 +6,20 @@
    ===================================================================== */
 import { useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { useHistory } from "@/lib/queries";
+import { useHistory, useBuddy } from "@/lib/queries";
 import { Card, EyebrowTag, Reveal, Skeleton, SkeletonText } from "@/components/ui";
 import { ActivityHeatmap } from "./history/ActivityHeatmap";
 import { StatsRow } from "./history/StatsRow";
 import { SessionFeed } from "./history/SessionFeed";
 import { EmptyHistory } from "./history/EmptyHistory";
+import { WeeklyWrap } from "./history/WeeklyWrap";
 import { aggregateByDay, buildHeatmap, computeStats } from "./history/dates";
 
 const FETCH_LIMIT = 200;
 
 export function History() {
   const { data, isLoading, isError, error } = useHistory(FETCH_LIMIT, 0);
+  const { data: buddy } = useBuddy();
 
   // Surface fetch failures as a toast (errors → sonner, per the brief).
   useEffect(() => {
@@ -59,6 +61,11 @@ export function History() {
           <EmptyHistory />
         ) : (
           <div className="flex flex-col gap-6">
+            {/* Spotify-Wrapped-style recap of the last 7 days. */}
+            <Reveal>
+              <WeeklyWrap sessions={sessions} buddy={buddy} />
+            </Reveal>
+
             {/* Heatmap + stats live in one tall card. */}
             <Reveal>
               <Card>
