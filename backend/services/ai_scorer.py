@@ -11,6 +11,7 @@ Design goals (free-tier-ready + fault-tolerant):
 """
 
 import json
+import math
 import re
 import httpx
 from config import get_settings
@@ -84,21 +85,27 @@ async def score_session(duration_minutes: int, work_log: str) -> dict:
 
 
 def _build_prompt(duration_minutes: int, work_log: str) -> str:
-    """Build the scoring prompt sent to the LLM."""
-    return f"""You are a productivity scoring assistant. Score this study session.
+    """Build the scoring prompt sent to the LLM.
 
-Session duration: {duration_minutes} minutes
+    Calibrated to use the FULL 0-100 range with PRECISE integers — models tend to
+    lazily default to round multiples of 5/10, which makes every score feel fake.
+    """
+    return f"""You are a strict but fair productivity coach scoring ONE focus session from 0 to 100.
+
+Session length: {duration_minutes} minutes
 Work log: "{work_log}"
 
-Rules:
-- Score from 0 to 100
-- Consider: session length, specificity of work described, quality indicators
-- Short sessions (<15 min) cap at 40 unless very productive
-- Vague logs like "studied" score lower than specific logs like "Solved 5 LeetCode problems on trees"
-- Longer focused sessions (2+ hours) with specific work score highest
+Scoring bands (use the FULL range; pick the EXACT number that fits — e.g. 12, 38, 47, 63, 81 — and do NOT default to round multiples of 5 or 10):
+- 0-20  : barely any focus, or an empty / vague log ("studied", "worked on stuff")
+- 21-45 : a short or unfocused session, or a thin/generic log
+- 46-70 : a solid, real session described with some specifics
+- 71-88 : a long, focused session with concrete, detailed work and clear output
+- 89-100: exceptional depth, duration, AND specificity
 
-Return ONLY valid JSON, nothing else:
-{{"score": <integer 0-100>, "summary": "<one sentence summary of what was accomplished>"}}"""
+Judge on three things together: (1) duration, (2) how specific/concrete the work log is, (3) signs of real output (numbers, named tasks, problems solved, things built). A short session cannot score high. A long session with a vague log should not score high either. Reward precision and honesty.
+
+Return ONLY valid JSON — no prose, no markdown, no code fences:
+{{"score": <exact integer 0-100, not rounded to a multiple of 5>, "summary": "<one concrete sentence on what was accomplished>"}}"""
 
 
 async def _call_openrouter(
@@ -120,7 +127,9 @@ async def _call_openrouter(
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 200,
-            "temperature": 0.2,
+            # A little headroom so the model commits to a precise number instead
+            # of lazily snapping to a round default, while staying consistent.
+            "temperature": 0.35,
         },
     )
     response.raise_for_status()
@@ -176,58 +185,54 @@ def _clamp_score(raw) -> int:
 def _score_with_algorithm(duration_minutes: int, work_log: str) -> dict:
     """Deterministic fallback scoring (no network).
 
-    Also used to compute the "breakdown" attached to every result. The three
-    factors are duration, work-log quality (word count), and specificity
-    (keyword hits).
+    Uses CONTINUOUS curves (smooth diminishing returns) rather than coarse
+    buckets, so scores are fine-grained across the full 1-100 range (e.g. 12, 49,
+    83) instead of always landing on a multiple of 5. Three weighted factors:
+    duration, work-log depth (word count), and specificity (concrete-work
+    signals). Also produces the "breakdown" attached to every result.
     """
-    work_log = work_log or ""
+    work_log = (work_log or "").strip()
+    words = work_log.split()
+    word_count = len(words)
+    lower = work_log.lower()
 
-    # Duration scoring (0-40 points)
-    if duration_minutes >= 120:
-        duration_points = 40
-    elif duration_minutes >= 60:
-        duration_points = 30
-    elif duration_minutes >= 30:
-        duration_points = 20
-    elif duration_minutes >= 15:
-        duration_points = 10
-    else:
-        duration_points = 5
+    # Duration — smooth diminishing returns, 0..48. ~25 at 45 min, ~37 at 90 min.
+    minutes = max(0, duration_minutes)
+    duration_score = 48.0 * (1.0 - math.exp(-minutes / 60.0))
 
-    # Work log quality (0-40 points)
-    words = len(work_log.split())
-    if words >= 30:
-        worklog_points = 40
-    elif words >= 15:
-        worklog_points = 30
-    elif words >= 8:
-        worklog_points = 20
-    elif words >= 3:
-        worklog_points = 10
-    else:
-        worklog_points = 5
+    # Depth — word count with diminishing returns, 0..38. Rewards a real log
+    # without letting someone farm points by rambling.
+    depth_score = 38.0 * (1.0 - math.exp(-word_count / 14.0))
 
-    # Specificity bonus (0-20 points) — keywords suggest real, concrete work.
+    # Specificity — concrete-work signals, 0..22.
     specificity_keywords = [
         "chapter", "problem", "solved", "built", "wrote", "read",
         "reviewed", "practiced", "completed", "finished", "learned",
         "coded", "debugged", "implemented", "studied", "notes",
+        "tested", "designed", "fixed", "shipped", "refactored",
     ]
-    keyword_hits = sum(1 for kw in specificity_keywords if kw in work_log.lower())
-    specificity_points = min(20, keyword_hits * 5)
+    keyword_hits = sum(1 for kw in specificity_keywords if kw in lower)
+    has_number = 1 if re.search(r"\d", work_log) else 0
+    sentences = [s for s in re.split(r"[.!?]+", work_log) if s.strip()]
+    multi_sentence = 1 if len(sentences) >= 2 else 0
+    specificity_score = min(
+        22.0, keyword_hits * 3.5 + has_number * 3.0 + multi_sentence * 2.0
+    )
 
-    score = min(100, duration_points + worklog_points + specificity_points)
+    raw = duration_score + depth_score + specificity_score
+    # A completed session is always worth at least 1; cap at 100.
+    score = max(1, min(100, int(round(raw))))
 
     summary = f"Worked for {duration_minutes} minutes."
-    if words >= 8:
+    if word_count >= 8:
         # Use the first sentence as a concise summary.
-        summary = work_log.split(".")[0].strip() + "."
+        summary = (work_log.split(".")[0].strip() or summary).rstrip(".") + "."
 
     breakdown = {
-        "duration_points": duration_points,
-        "worklog_points": worklog_points,
-        "specificity_points": specificity_points,
-        "word_count": words,
+        "duration_points": round(duration_score, 1),
+        "worklog_points": round(depth_score, 1),
+        "specificity_points": round(specificity_score, 1),
+        "word_count": word_count,
         "keyword_hits": keyword_hits,
     }
 
