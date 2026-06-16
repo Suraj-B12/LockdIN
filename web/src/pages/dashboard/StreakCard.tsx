@@ -6,7 +6,7 @@
    ===================================================================== */
 import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Flame, Trophy, type Icon } from "@phosphor-icons/react";
+import { Flame, Trophy, Snowflake, type Icon } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui";
 import type { BuddyResponse, SessionResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
@@ -54,6 +54,7 @@ export function StreakCard({ buddy, buddyLoading, sessions, sessionsLoading }: S
 
   const current = buddy?.current_streak ?? 0;
   const longest = buddy?.longest_streak ?? 0;
+  const freezes = buddy?.streak_freezes ?? null;
   // Best is at least the current run (a live streak is, by definition, a record
   // in progress) — guards against any momentary lag in the stored longest.
   const best = Math.max(longest, current);
@@ -94,6 +95,15 @@ export function StreakCard({ buddy, buddyLoading, sessions, sessionsLoading }: S
         />
       </div>
       <p className="mt-3 text-sm text-ink-muted">{subtitle}</p>
+
+      {/* Streak freezes — a missed day won't break the run while you have these. */}
+      {!buddyLoading && freezes != null && freezes > 0 && (
+        <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-ink-faint">
+          <Snowflake weight="fill" className="h-3.5 w-3.5 text-teal-bright" />
+          {freezes} streak {freezes === 1 ? "freeze" : "freezes"} — a missed day won't break your
+          streak.
+        </p>
+      )}
 
       {/* 7-day mini bars */}
       <div className="mt-6">

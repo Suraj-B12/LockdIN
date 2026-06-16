@@ -38,6 +38,8 @@ export interface BuddyResponse {
   current_streak: number;
   longest_streak: number;
   last_session_date: string | null;
+  /** Streak freezes banked (cap 2). null on DBs without migration 006. */
+  streak_freezes?: number | null;
 }
 
 export interface UpdateBuddyBody {

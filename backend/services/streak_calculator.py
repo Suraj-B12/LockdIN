@@ -75,6 +75,80 @@ def _calculate_longest(dates: list[date]) -> int:
     return longest
 
 
+# ---- Streak freeze (humane streak: a missed day doesn't zero a run) ----
+
+MAX_FREEZES = 2            # cap on how many freezes a user can bank
+_MAX_BRIDGE_DAYS = 2       # a freeze run can cover at most this many missed days
+_MILESTONES = (7, 30, 100, 365)
+
+
+def _crossed_milestone(prior: int, current: int) -> bool:
+    """True if `current` passed a milestone that `prior` had not yet reached."""
+    return any(prior < m <= current for m in _MILESTONES)
+
+
+def _maybe_bridge_with_freezes(user_id: str, buddy_row: dict | None) -> int:
+    """If the streak just broke by a SMALL gap and the user has freeze(s), spend
+    them to bridge the missed day(s) — insert 'frozen' day rows so the streak
+    survives — and decrement the balance. Returns the number of freezes spent.
+
+    No-op (returns 0) unless the `streak_freezes` column exists (migration 006)
+    and there are freezes to spend, so it's safe to ship before the migration.
+    Best-effort: any failure is swallowed (a heal/finish must never break).
+    """
+    if not buddy_row or "streak_freezes" not in buddy_row:
+        return 0
+    freezes = buddy_row.get("streak_freezes") or 0
+    if freezes <= 0:
+        return 0
+
+    db = get_supabase()
+    try:
+        res = db.table("streaks") \
+            .select("streak_date") \
+            .eq("user_id", user_id) \
+            .eq("completed", True) \
+            .order("streak_date", desc=True) \
+            .limit(1) \
+            .execute()
+        if not res.data:
+            return 0
+
+        last = date.fromisoformat(res.data[0]["streak_date"])
+        today = date.today()
+        missed = (today - last).days - 1  # days strictly between last and today
+        # Alive already (today/yesterday), or gap too long to fully save.
+        if missed < 1 or missed > min(freezes, _MAX_BRIDGE_DAYS):
+            return 0
+
+        spent = 0
+        for i in range(1, missed + 1):
+            d = (last + timedelta(days=i)).isoformat()
+            try:
+                db.table("streaks").insert({
+                    "user_id": user_id,
+                    "streak_date": d,
+                    "daily_seconds": 0,
+                    "daily_score": 0,
+                    "completed": True,
+                    "frozen": True,
+                }).execute()
+                spent += 1
+            except Exception:
+                # Row already exists (concurrent bridge / not actually missed) — skip.
+                pass
+
+        if spent > 0:
+            new_freezes = max(0, freezes - spent)
+            db.table("buddies").update({"streak_freezes": new_freezes}) \
+                .eq("user_id", user_id).execute()
+            buddy_row["streak_freezes"] = new_freezes
+        return spent
+    except Exception:
+        log.warning("streak-freeze bridge failed for user %s", user_id, exc_info=True)
+        return 0
+
+
 def _days_since(last_session_date) -> int | None:
     """Whole days from `last_session_date` (date or ISO str) to today, or None."""
     if not last_session_date:
@@ -143,6 +217,12 @@ def refresh_streak_for_user(
             if not res.data:
                 return None
             buddy_row = res.data[0]
+
+        # On the OWNER's own read/cron (persist), spend a freeze to bridge a small
+        # gap before measuring, so a missed day doesn't zero the run. Never on a
+        # friend's view (persist=False) — we don't spend someone else's freezes.
+        if persist:
+            _maybe_bridge_with_freezes(user_id, buddy_row)
 
         streaks = calculate_streak(user_id)
         current = streaks["current_streak"]
@@ -271,6 +351,17 @@ def update_streak_and_buddy(user_id: str, session_seconds: int, session_score: i
     db = get_supabase()
     today = date.today().isoformat()
 
+    # Fetch the buddy first — we need the prior streak (for milestone detection)
+    # and the freeze balance. Tolerate absence (shouldn't happen post-trigger).
+    bud = db.table("buddies").select("*").eq("user_id", user_id).execute()
+    buddy_row = bud.data[0] if bud.data else None
+    prior_streak = (buddy_row or {}).get("current_streak") or 0
+
+    # Returning after a 1–2 day gap? Spend a freeze to bridge it BEFORE recording
+    # today, so the run stays continuous instead of resetting.
+    if buddy_row:
+        _maybe_bridge_with_freezes(user_id, buddy_row)
+
     # Upsert today's streak entry
     existing = db.table("streaks") \
         .select("*") \
@@ -301,9 +392,19 @@ def update_streak_and_buddy(user_id: str, session_seconds: int, session_score: i
 
     # Update buddy
     mood = get_mood_level(streaks["current_streak"])
-    db.table("buddies").update({
+    update_payload = {
         "current_streak": streaks["current_streak"],
         "longest_streak": streaks["longest_streak"],
         "mood_level": mood,
-        "last_session_date": today
-    }).eq("user_id", user_id).execute()
+        "last_session_date": today,
+    }
+
+    # Reward hitting a milestone with one extra freeze (capped). Only if the
+    # column exists (migration 006) — otherwise this is silently skipped.
+    if buddy_row and "streak_freezes" in buddy_row and _crossed_milestone(
+        prior_streak, streaks["current_streak"]
+    ):
+        current_freezes = buddy_row.get("streak_freezes") or 0
+        update_payload["streak_freezes"] = min(MAX_FREEZES, current_freezes + 1)
+
+    db.table("buddies").update(update_payload).eq("user_id", user_id).execute()

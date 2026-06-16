@@ -87,6 +87,8 @@ class BuddyResponse(BaseModel):
     current_streak: int
     longest_streak: int
     last_session_date: Optional[date] = None
+    # Present once migration 006 is applied; None on older DBs (additive).
+    streak_freezes: Optional[int] = None
 
 
 class BuddyUpdate(BaseModel):
