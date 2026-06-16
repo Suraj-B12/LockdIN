@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Card } from "@/components/ui";
 import { RecapInbox } from "@/components/RecapInbox";
+import { MilestoneModal } from "@/components/MilestoneModal";
 import { useProfile, useHistory, useBuddy, useFriendsActivity } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import {
@@ -18,6 +19,8 @@ import {
   markRecapShownThisSession,
   defaultSince,
 } from "@/lib/recap";
+import { milestoneReached, getLastCelebrated, setLastCelebrated } from "@/lib/milestones";
+import { celebrate } from "@/lib/celebrate";
 import { revealStagger, revealItem } from "@/lib/motion";
 // NOTE: import the subcomponents by their explicit file paths. The folder
 // `pages/dashboard/` and this file `pages/Dashboard.tsx` differ only in case,
@@ -63,8 +66,25 @@ export function Dashboard() {
   const { data: recap } = useFriendsActivity(recapSince, { enabled: !!userId });
   const [recapOpen, setRecapOpen] = useState(false);
 
+  // ---- Streak milestone celebration (takes precedence over the recap) ----
+  const [milestone, setMilestone] = useState<number | null>(null);
+  const currentStreak = buddy?.current_streak ?? 0;
+
   useEffect(() => {
-    if (!userId || !recap || recapShownThisSession()) return;
+    if (!userId || !buddy) return;
+    const reached = milestoneReached(currentStreak);
+    if (reached && reached > getLastCelebrated(userId)) {
+      setMilestone(reached);
+      setLastCelebrated(userId, reached);
+      // A milestone owns the spotlight: suppress the recap this session.
+      markRecapShownThisSession();
+      setRecapOpen(false);
+      celebrate();
+    }
+  }, [userId, buddy, currentStreak]);
+
+  useEffect(() => {
+    if (!userId || !recap || recapShownThisSession() || milestone != null) return;
     const returning = !!getRecapLastSeen(userId);
     // Auto-open when friends were productive, or (for returning users) when
     // there are quiet friends worth nudging. Never nag first-time users with an
@@ -76,7 +96,7 @@ export function Dashboard() {
       // Mark this as the catch-up point even if they navigate away without closing.
       setRecapLastSeen(userId, new Date().toISOString());
     }
-  }, [userId, recap]);
+  }, [userId, recap, milestone]);
 
   const closeRecap = () => {
     setRecapOpen(false);
@@ -149,6 +169,13 @@ export function Dashboard() {
           </Card>
         </Cell>
       </motion.div>
+
+      {/* Streak milestone celebration (takes precedence over the recap) */}
+      <AnimatePresence>
+        {milestone != null && buddy && (
+          <MilestoneModal milestone={milestone} buddy={buddy} onClose={() => setMilestone(null)} />
+        )}
+      </AnimatePresence>
 
       {/* "While you were gone" friend recap (auto-opens once per session) */}
       <AnimatePresence>
