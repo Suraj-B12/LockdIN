@@ -179,8 +179,11 @@ def _maybe_bridge_with_freezes(user_id: str, buddy_row: dict | None) -> int:
 
         if spent > 0:
             new_freezes = max(0, freezes - spent)
+            # Compare-and-set: only decrement if the balance is still what we read,
+            # so a concurrent bridge/finish can't be clobbered. If it loses the
+            # race the write is skipped (best-effort — generous, never negative).
             db.table("buddies").update({"streak_freezes": new_freezes}) \
-                .eq("user_id", user_id).execute()
+                .eq("user_id", user_id).eq("streak_freezes", freezes).execute()
             buddy_row["streak_freezes"] = new_freezes
         return spent
     except Exception:

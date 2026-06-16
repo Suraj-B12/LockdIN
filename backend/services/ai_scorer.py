@@ -72,7 +72,9 @@ async def score_session(duration_minutes: int, work_log: str) -> dict:
 
                 return {
                     "score": _clamp_score(parsed.get("score")),
-                    "summary": str(parsed.get("summary") or "Session completed.").strip(),
+                    # Strip first, THEN fall back, so a whitespace-only reply
+                    # doesn't collapse to an empty summary.
+                    "summary": (str(parsed.get("summary") or "").strip() or "Session completed."),
                     "model_used": model,
                     "breakdown": breakdown,
                 }
@@ -174,9 +176,14 @@ def _parse_score_json(content: str) -> dict | None:
 
 
 def _clamp_score(raw) -> int:
-    """Coerce a model-supplied score to an int in [0, 100]."""
+    """Coerce a model-supplied score to an int in [0, 100].
+
+    Non-finite values (inf/-inf, which json.loads accepts as `Infinity`) would
+    raise OverflowError on int() — treat those (and NaN) as 0.
+    """
     try:
-        value = int(float(raw))
+        f = float(raw)
+        value = int(f) if math.isfinite(f) else 0
     except (TypeError, ValueError):
         value = 0
     return max(0, min(100, value))

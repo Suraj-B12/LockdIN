@@ -1,7 +1,8 @@
 /* =====================================================================
    Streak milestones — celebrate meaningful runs (client-side, no backend).
-   We remember per-user the highest milestone already celebrated (localStorage)
-   so each one fires exactly once, the moment the streak reaches it.
+   We remember per-user the highest milestone celebrated in the CURRENT run
+   (localStorage); the Dashboard resets that floor to 0 when a streak breaks, so
+   each milestone fires once per run — and re-fires on a fresh run after a reset.
    ===================================================================== */
 
 export const MILESTONES = [3, 7, 14, 30, 50, 100, 200, 365];

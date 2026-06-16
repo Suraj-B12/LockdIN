@@ -72,6 +72,11 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!userId || !buddy) return;
+    // The stored "last celebrated" is scoped to the CURRENT run: if the streak
+    // reset (now below the stored floor), drop the floor so milestones can be
+    // celebrated again on the next run — otherwise long-time users would stop
+    // seeing celebrations entirely after one broken streak.
+    if (currentStreak < getLastCelebrated(userId)) setLastCelebrated(userId, 0);
     const reached = milestoneReached(currentStreak);
     if (reached && reached > getLastCelebrated(userId)) {
       setMilestone(reached);

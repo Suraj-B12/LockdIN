@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import { Sparkle, Clock, Lightning, CalendarCheck, Trophy } from "@phosphor-icons/react";
 import { getBuddyAvatar } from "@/lib/buddy";
+import { localKey } from "./dates";
 import type { BuddyResponse, SessionResponse } from "@/lib/types";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -19,9 +20,10 @@ function fmtDuration(seconds: number): string {
   return rem ? `${h}h ${rem}m` : `${h}h`;
 }
 
+// Local-day key (matches the heatmap's day attribution, not UTC).
 function dayKey(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  return Number.isNaN(d.getTime()) ? "" : localKey(d);
 }
 
 interface WeekAgg {
@@ -53,7 +55,9 @@ export interface WeeklyWrapProps {
 export function WeeklyWrap({ sessions, buddy }: WeeklyWrapProps) {
   const { week, deltaPct } = useMemo(() => {
     const now = Date.now();
-    const w = aggregate(sessions, now - 7 * DAY, now + DAY);
+    // Symmetric 7-day rolling windows; `now` is the exclusive upper bound so the
+    // current week can't be 8 days wide (which caused "8/7" + a biased trend).
+    const w = aggregate(sessions, now - 7 * DAY, now);
     const prev = aggregate(sessions, now - 14 * DAY, now - 7 * DAY);
     const delta =
       prev.seconds > 0 ? Math.round(((w.seconds - prev.seconds) / prev.seconds) * 100) : null;
@@ -119,7 +123,7 @@ export function WeeklyWrap({ sessions, buddy }: WeeklyWrapProps) {
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <WrapStat icon={Clock} label="Focus time" value={hours} />
           <WrapStat icon={Lightning} label="Sessions" value={String(week.count)} />
-          <WrapStat icon={CalendarCheck} label="Active days" value={`${week.days.size}/7`} />
+          <WrapStat icon={CalendarCheck} label="Active days" value={`${Math.min(7, week.days.size)}/7`} />
           <WrapStat
             icon={Trophy}
             label="Best score"
