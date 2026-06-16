@@ -10,6 +10,7 @@
    Tone law (matches the product): warm, a little playful, never cheesy, never
    guilt/fear. The buddy mirrors YOUR consistency and cheers you on.
    ===================================================================== */
+import { useSyncExternalStore } from "react";
 
 export interface BuddyState {
   buddyName?: string;
@@ -165,9 +166,136 @@ export function pickBuddyLine(state: BuddyState): string {
 
 /* ---------------------------------------------------------------------------
    Speech (Web Speech API) — "nice to hear", best-effort, never throws.
+   Users pick a VOICE and a STYLE (rate/pitch personality) in Manage; both
+   persist in localStorage. Mute is a reactive store so every card + the
+   settings panel stay in sync without a refetch.
    ------------------------------------------------------------------------- */
 
+export function speechSupported(): boolean {
+  return typeof window !== "undefined" && "speechSynthesis" in window;
+}
+
+/** True only on devices with a real hover pointer (desktop), so touch taps —
+ *  which synthesize a mouseenter before click — don't double-trigger a line. */
+export function canHoverPointer(): boolean {
+  try {
+    return typeof window !== "undefined" && window.matchMedia?.("(hover: hover)").matches === true;
+  } catch {
+    return false;
+  }
+}
+
+export function cancelSpeech(): void {
+  try {
+    if (speechSupported()) window.speechSynthesis.cancel();
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ---- Style presets (rate/pitch personalities) ---- */
+export interface BuddyStyle {
+  id: string;
+  label: string;
+  rate: number;
+  pitch: number;
+  hint: string;
+}
+
+export const BUDDY_STYLES: BuddyStyle[] = [
+  { id: "warm", label: "Warm", rate: 1.0, pitch: 1.1, hint: "Friendly and steady" },
+  { id: "cheerful", label: "Cheerful", rate: 1.08, pitch: 1.34, hint: "Bright and upbeat" },
+  { id: "calm", label: "Calm", rate: 0.9, pitch: 1.0, hint: "Soft and soothing" },
+  { id: "energetic", label: "Energetic", rate: 1.22, pitch: 1.28, hint: "Fast and hyped" },
+  { id: "deep", label: "Deep", rate: 0.95, pitch: 0.78, hint: "Low and grounded" },
+];
+const DEFAULT_STYLE = "warm";
+
+const STYLE_KEY = "lockdin:buddyStyle";
+const VOICE_KEY = "lockdin:buddyVoiceURI";
 const MUTE_KEY = "lockdin:buddyMuted";
+
+export function getBuddyStyleId(): string {
+  try {
+    return localStorage.getItem(STYLE_KEY) || DEFAULT_STYLE;
+  } catch {
+    return DEFAULT_STYLE;
+  }
+}
+export function setBuddyStyleId(id: string): void {
+  try {
+    localStorage.setItem(STYLE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+function currentStyle(): BuddyStyle {
+  return BUDDY_STYLES.find((s) => s.id === getBuddyStyleId()) ?? BUDDY_STYLES[0];
+}
+
+export function getBuddyVoiceURI(): string | null {
+  try {
+    return localStorage.getItem(VOICE_KEY);
+  } catch {
+    return null;
+  }
+}
+export function setBuddyVoiceURI(uri: string | null): void {
+  try {
+    if (uri) localStorage.setItem(VOICE_KEY, uri);
+    else localStorage.removeItem(VOICE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Available voices, English first, for the picker. Empty until voices load.
+ *  CACHED: useSyncExternalStore requires a stable reference between changes, so
+ *  we recompute only on voiceschanged (see below), not on every read. */
+const EMPTY_VOICES: SpeechSynthesisVoice[] = [];
+let voicesCache: SpeechSynthesisVoice[] | null = null;
+
+function computeVoices(): SpeechSynthesisVoice[] {
+  if (!speechSupported()) return EMPTY_VOICES;
+  const all = window.speechSynthesis.getVoices() || [];
+  if (!all.length) return EMPTY_VOICES;
+  const en = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+  const rest = all.filter((v) => !v.lang?.toLowerCase().startsWith("en"));
+  return [...en, ...rest];
+}
+
+export function listVoices(): SpeechSynthesisVoice[] {
+  if (voicesCache === null) voicesCache = computeVoices();
+  return voicesCache;
+}
+
+/** Resolve the SpeechSynthesisVoice to use: the user's pick, else a nice default. */
+function resolveVoice(): SpeechSynthesisVoice | null {
+  if (!speechSupported()) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const uri = getBuddyVoiceURI();
+  if (uri) {
+    const chosen = voices.find((v) => v.voiceURI === uri);
+    if (chosen) return chosen;
+  }
+  const prefer = [
+    "Google UK English Female",
+    "Samantha",
+    "Karen",
+    "Google US English",
+    "Microsoft Aria Online (Natural) - English (United States)",
+  ];
+  return (
+    prefer.map((n) => voices.find((v) => v.name === n)).find(Boolean) ??
+    voices.find((v) => v.lang?.startsWith("en") && /female|aria|samantha|karen/i.test(v.name)) ??
+    voices.find((v) => v.lang?.startsWith("en")) ??
+    voices[0]
+  );
+}
+
+/* ---- Mute (reactive store so cards + settings stay in sync) ---- */
+const muteListeners = new Set<() => void>();
 
 export function isBuddyMuted(): boolean {
   try {
@@ -184,56 +312,35 @@ export function setBuddyMuted(muted: boolean): void {
     /* ignore */
   }
   if (muted) cancelSpeech();
+  muteListeners.forEach((l) => l());
 }
 
-export function speechSupported(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
+function subscribeMuted(cb: () => void): () => void {
+  muteListeners.add(cb);
+  return () => muteListeners.delete(cb);
 }
 
-/** Prefer a pleasant local English voice; cache the choice. */
-let chosenVoice: SpeechSynthesisVoice | null = null;
-function pickVoice(): SpeechSynthesisVoice | null {
-  if (!speechSupported()) return null;
-  if (chosenVoice) return chosenVoice;
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-  const prefer = [
-    "Google UK English Female",
-    "Samantha",
-    "Karen",
-    "Google US English",
-    "Microsoft Aria Online (Natural) - English (United States)",
-  ];
-  chosenVoice =
-    prefer.map((n) => voices.find((v) => v.name === n)).find(Boolean) ??
-    voices.find((v) => v.lang?.startsWith("en") && /female|aria|samantha|karen/i.test(v.name)) ??
-    voices.find((v) => v.lang?.startsWith("en")) ??
-    voices[0];
-  return chosenVoice;
-}
-
-export function cancelSpeech(): void {
-  try {
-    if (speechSupported()) window.speechSynthesis.cancel();
-  } catch {
-    /* ignore */
-  }
+/** Reactive mute flag — re-renders all consumers when it changes anywhere. */
+export function useBuddyMuted(): boolean {
+  return useSyncExternalStore(subscribeMuted, isBuddyMuted, () => false);
 }
 
 /**
- * Speak a line aloud (best-effort). No-ops when unsupported or muted. Cancels
- * any in-flight utterance first so taps don't pile up.
+ * Speak a line aloud (best-effort). No-ops when unsupported or muted (unless
+ * `force`, used by the Manage preview). Cancels any in-flight utterance first.
  */
-export function speakLine(text: string): void {
+export function speakLine(text: string, opts?: { force?: boolean }): void {
   try {
-    if (!speechSupported() || isBuddyMuted() || !text) return;
+    if (!speechSupported() || !text) return;
+    if (!opts?.force && isBuddyMuted()) return;
     const synth = window.speechSynthesis;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const v = pickVoice();
+    const v = resolveVoice();
     if (v) u.voice = v;
-    u.rate = 1.02;
-    u.pitch = 1.12; // a touch bright/friendly
+    const style = currentStyle();
+    u.rate = style.rate;
+    u.pitch = style.pitch;
     u.volume = 1;
     synth.speak(u);
   } catch {
@@ -241,12 +348,17 @@ export function speakLine(text: string): void {
   }
 }
 
-// Voices populate asynchronously in most browsers — warm the cache when ready.
+/* Voices populate asynchronously — notify any voice-picker listeners on load. */
+const voiceListeners = new Set<() => void>();
+export function subscribeVoices(cb: () => void): () => void {
+  voiceListeners.add(cb);
+  return () => voiceListeners.delete(cb);
+}
 if (speechSupported()) {
   try {
     window.speechSynthesis.onvoiceschanged = () => {
-      chosenVoice = null;
-      pickVoice();
+      voicesCache = computeVoices(); // refresh the cached (stable-ref) list
+      voiceListeners.forEach((l) => l());
     };
   } catch {
     /* ignore */

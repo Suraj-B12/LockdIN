@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { SpeakerHigh, SpeakerSlash, ArrowClockwise } from "@phosphor-icons/react";
+import { speechSupported } from "@/lib/buddySpeech";
 import { cn } from "@/lib/cn";
 
 export interface BuddySpeechBubbleProps {
@@ -64,6 +65,7 @@ export function BuddySpeechBubble({
   }, [text, nonce]);
 
   const typing = shown.length < text.length;
+  const canSpeak = speechSupported();
 
   return (
     <motion.div
@@ -74,7 +76,12 @@ export function BuddySpeechBubble({
       exit={{ opacity: 0, y: 6, scale: 0.96 }}
       transition={{ type: "spring", stiffness: 460, damping: 30 }}
       className={cn(
-        "relative max-w-xs rounded-2xl bg-surface-2/95 px-4 py-3 text-left shadow-card-hover ring-1 ring-inset ring-hairline/12 backdrop-blur-sm",
+        // Explicit width (not max-w) — an absolutely-positioned bubble would
+        // otherwise shrink to its tiny avatar-sized containing block and wrap to
+        // ~2 words a line. A fixed, mobile-safe width keeps it horizontal + readable.
+        // No `position` here — the caller positions it (absolute) so it can be the
+        // DIRECT AnimatePresence child and its exit animation actually plays.
+        "w-[min(21rem,calc(100vw-2.5rem))] rounded-2xl bg-surface-2/95 px-4 py-3 text-left shadow-card-hover ring-1 ring-inset ring-hairline/12 backdrop-blur-sm",
         className
       )}
     >
@@ -87,36 +94,47 @@ export function BuddySpeechBubble({
         )}
       />
 
-      <p className="font-display text-[15px] leading-snug tracking-tight text-ink">
+      {/* Body font (Geist) for comfortable multi-line readability. */}
+      <p className="text-[15px] leading-relaxed text-pretty text-ink">
         {shown}
         {typing && (
-          <span className="ml-0.5 inline-block w-[2px] animate-pulse bg-teal-bright align-middle" style={{ height: "1em" }} />
+          <span
+            className="ml-0.5 inline-block w-[2px] animate-pulse bg-teal-bright align-middle"
+            style={{ height: "1em" }}
+          />
         )}
       </p>
 
-      <div className="mt-2 flex items-center justify-end gap-1">
-        <button
-          type="button"
-          onClick={onReplay}
-          aria-label="Say it again"
-          className="grid h-7 w-7 place-items-center rounded-lg text-ink-faint transition-colors duration-200 hover:bg-surface-3/60 hover:text-teal-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55"
-        >
-          <ArrowClockwise weight="bold" className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onToggleMute}
-          aria-label={muted ? "Unmute buddy" : "Mute buddy"}
-          aria-pressed={muted}
-          className="grid h-7 w-7 place-items-center rounded-lg text-ink-faint transition-colors duration-200 hover:bg-surface-3/60 hover:text-teal-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55"
-        >
-          {muted ? (
-            <SpeakerSlash weight="bold" className="h-3.5 w-3.5" />
-          ) : (
-            <SpeakerHigh weight="bold" className="h-3.5 w-3.5" />
-          )}
-        </button>
-      </div>
+      {/* Controls — only meaningful when the device can speak. */}
+      {canSpeak && (
+        <div className="mt-2 flex items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={onReplay}
+            disabled={muted}
+            aria-label="Say it again"
+            className="grid h-7 w-7 place-items-center rounded-lg text-ink-faint transition-colors duration-200 hover:bg-surface-3/60 hover:text-teal-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+          >
+            <ArrowClockwise weight="bold" className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleMute}
+            aria-label={muted ? "Unmute buddy" : "Mute buddy"}
+            aria-pressed={muted}
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-lg transition-colors duration-200 hover:bg-surface-3/60 hover:text-teal-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55",
+              muted ? "text-teal-bright" : "text-ink-faint"
+            )}
+          >
+            {muted ? (
+              <SpeakerSlash weight="bold" className="h-3.5 w-3.5" />
+            ) : (
+              <SpeakerHigh weight="bold" className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

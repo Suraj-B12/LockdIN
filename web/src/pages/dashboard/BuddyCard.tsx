@@ -15,8 +15,9 @@ import { getBuddyAvatar, moodLabel } from "@/lib/buddy";
 import {
   pickBuddyLine,
   speakLine,
-  isBuddyMuted,
+  useBuddyMuted,
   setBuddyMuted,
+  canHoverPointer,
 } from "@/lib/buddySpeech";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { CardHead } from "./parts";
@@ -27,7 +28,7 @@ export function BuddyCard() {
 
   const [line, setLine] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  const [muted, setMutedState] = useState(() => isBuddyMuted());
+  const muted = useBuddyMuted();
 
   const say = (speak: boolean) => {
     if (!buddy) return;
@@ -43,16 +44,13 @@ export function BuddyCard() {
   };
   const talk = () => say(true);
   const peek = () => {
-    if (!line) say(false);
+    // Desktop-only hover preview (touch taps fire talk() already).
+    if (canHoverPointer() && !line) say(false);
   };
   const replay = () => {
     if (line) speakLine(line);
   };
-  const toggleMute = () => {
-    const m = !muted;
-    setMutedState(m);
-    setBuddyMuted(m);
-  };
+  const toggleMute = () => setBuddyMuted(!muted);
 
   return (
     <div className="flex h-full flex-col">
@@ -93,17 +91,17 @@ export function BuddyCard() {
           <div className="relative">
             <AnimatePresence>
               {line && (
-                <div className="absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2">
-                  <BuddySpeechBubble
-                    text={line}
-                    nonce={nonce}
-                    muted={muted}
-                    onReplay={replay}
-                    onToggleMute={toggleMute}
-                    onDismiss={() => setLine(null)}
-                    tailAlign="center"
-                  />
-                </div>
+                <BuddySpeechBubble
+                  key="buddy-bubble"
+                  className="absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2"
+                  text={line}
+                  nonce={nonce}
+                  muted={muted}
+                  onReplay={replay}
+                  onToggleMute={toggleMute}
+                  onDismiss={() => setLine(null)}
+                  tailAlign="center"
+                />
               )}
             </AnimatePresence>
 
@@ -130,9 +128,12 @@ export function BuddyCard() {
             </button>
           </div>
 
-          <p className="mt-3 truncate font-display text-lg tracking-tight text-ink">
+          <Link
+            to="/profile"
+            className="mt-3 max-w-full truncate font-display text-lg tracking-tight text-ink transition-colors hover:text-teal-bright"
+          >
             {buddy.buddy_name}
-          </p>
+          </Link>
           <p className="text-xs font-medium uppercase tracking-eyebrow text-teal-bright">
             {moodLabel(buddy.mood_level)}
           </p>

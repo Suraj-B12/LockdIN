@@ -10,13 +10,15 @@ import { Flame, PencilSimple, Check, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui";
 import { BuddySpeechBubble } from "@/components/BuddySpeechBubble";
+import { BuddyVoiceSettings } from "@/components/BuddyVoiceSettings";
 import { useUpdateBuddy } from "@/lib/queries";
 import { getBuddyAvatar, moodLabel, moodEmoji, MOOD_MIN, MOOD_MAX } from "@/lib/buddy";
 import {
   pickBuddyLine,
   speakLine,
-  isBuddyMuted,
+  useBuddyMuted,
   setBuddyMuted,
+  canHoverPointer,
   type BuddyState,
 } from "@/lib/buddySpeech";
 import type { BuddyResponse } from "@/lib/types";
@@ -38,7 +40,7 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
   // ---- Talking buddy: tap (or hover) the avatar for a motivational line ----
   const [line, setLine] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  const [muted, setMutedState] = useState(() => isBuddyMuted());
+  const muted = useBuddyMuted();
 
   const buddyState: BuddyState = {
     buddyName: buddy.buddy_name,
@@ -55,16 +57,14 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
   };
   const talk = () => say(true); // click → spoken
   const peek = () => {
-    if (!line) say(false); // hover → silent, don't interrupt an active line
+    // Hover-preview is desktop-only: on touch the tap already fires talk(), and
+    // a synthesized mouseenter would double-pick a line and flicker the bubble.
+    if (canHoverPointer() && !line) say(false);
   };
   const replay = () => {
     if (line) speakLine(line);
   };
-  const toggleMute = () => {
-    const m = !muted;
-    setMutedState(m);
-    setBuddyMuted(m);
-  };
+  const toggleMute = () => setBuddyMuted(!muted);
 
   return (
     <Card tone="teal" bodyClassName="p-6 sm:p-7">
@@ -84,19 +84,20 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
       {/* Current buddy */}
       <div className="mt-5 flex items-center gap-5">
         <div className="relative shrink-0">
-          {/* Speech bubble floats above the avatar */}
+          {/* Speech bubble floats above the avatar (direct AnimatePresence child
+              so its exit animation plays). */}
           <AnimatePresence>
             {line && (
-              <div className="absolute bottom-full left-0 z-30 mb-3">
-                <BuddySpeechBubble
-                  text={line}
-                  nonce={nonce}
-                  muted={muted}
-                  onReplay={replay}
-                  onToggleMute={toggleMute}
-                  onDismiss={() => setLine(null)}
-                />
-              </div>
+              <BuddySpeechBubble
+                key="buddy-bubble"
+                className="absolute bottom-full left-0 z-30 mb-3"
+                text={line}
+                nonce={nonce}
+                muted={muted}
+                onReplay={replay}
+                onToggleMute={toggleMute}
+                onDismiss={() => setLine(null)}
+              />
             )}
           </AnimatePresence>
 
@@ -185,6 +186,9 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
           })}
         </div>
       </div>
+
+      {/* Voice & style — pick how your buddy sounds. */}
+      <BuddyVoiceSettings />
     </Card>
   );
 }
