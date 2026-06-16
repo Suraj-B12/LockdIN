@@ -134,6 +134,32 @@ class FriendAction(BaseModel):
     action: str = Field(..., pattern="^(accept|reject|block)$")
 
 
+# ========== FRIEND ACTIVITY RECAP (the "while you were gone" inbox) ==========
+
+class FriendActivityItem(BaseModel):
+    friend_id: UUID
+    friend_name: Optional[str] = None
+    friend_avatar: Optional[str] = None
+    buddy_name: Optional[str] = None
+    buddy_type: Optional[str] = None
+    mood_level: Optional[int] = None
+    # Aggregated over finished sessions since `since`.
+    sessions_count: int = 0
+    total_seconds: int = 0
+    best_score: Optional[int] = None
+    last_finished_at: Optional[datetime] = None
+    # True if they finished at least one session since `since`.
+    active: bool = False
+
+
+class FriendActivityResponse(BaseModel):
+    since: datetime
+    generated_at: datetime
+    active_count: int
+    idle_count: int
+    items: list[FriendActivityItem] = Field(default_factory=list)
+
+
 # ========== LEADERBOARD ==========
 
 class LeaderboardEntry(BaseModel):

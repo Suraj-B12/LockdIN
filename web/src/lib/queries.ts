@@ -20,6 +20,7 @@ import type {
   FriendResponse,
   FriendRequestBody,
   FriendActionBody,
+  FriendActivityResponse,
   NotificationPreferences,
   NotificationPreferencesUpdate,
   ProfileResponse,
@@ -38,6 +39,7 @@ export const qk = {
   friends: ["friends", "list"] as const,
   friendsPending: ["friends", "pending"] as const,
   friendsSent: ["friends", "sent"] as const,
+  friendsActivity: (since: string) => ["friends", "activity", since] as const,
   notificationPrefs: ["notifications", "preferences"] as const,
   me: ["users", "me"] as const,
   userOverview: (userId: string) => ["users", "overview", userId] as const,
@@ -185,6 +187,27 @@ export function useSentRequests() {
   return useQuery({
     queryKey: qk.friendsSent,
     queryFn: ({ signal }) => api.get<FriendResponse[]>("/friends/sent", { signal }),
+  });
+}
+
+/**
+ * GET /friends/activity?since=ISO → FriendActivityResponse. Powers the "while
+ * you were gone" recap. `since` is part of the key so a new window refetches.
+ * Pass enabled:false until you've resolved the last-seen timestamp.
+ */
+export function useFriendsActivity(
+  since: string,
+  options?: Partial<UseQueryOptions<FriendActivityResponse>>
+) {
+  return useQuery({
+    queryKey: qk.friendsActivity(since),
+    queryFn: ({ signal }) =>
+      api.get<FriendActivityResponse>(
+        `/friends/activity?since=${encodeURIComponent(since)}`,
+        { signal }
+      ),
+    staleTime: 60_000,
+    ...options,
   });
 }
 

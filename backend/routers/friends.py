@@ -1,12 +1,18 @@
 """Friend system — add, accept, reject, list friends."""
 
 import asyncio
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
 from services.cache import rate_limit_ok
-from models.schemas import FriendRequest, FriendResponse, FriendAction
-from routers.notifications import notify_friend_request
+from models.schemas import (
+    FriendRequest,
+    FriendResponse,
+    FriendAction,
+    FriendActivityResponse,
+)
+from routers.notifications import notify_friend_request, _get_friend_ids
 
 router = APIRouter(prefix="/api/friends", tags=["Friends"])
 
@@ -93,6 +99,119 @@ async def list_sent_requests(user: dict = Depends(get_current_user)):
         friends.append(row)
 
     return friends
+
+
+@router.get("/activity", response_model=FriendActivityResponse)
+async def friends_activity(
+    since: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Recap of what your friends did since `since` (ISO-8601) — powers the
+    on-open "while you were gone" inbox.
+
+    For each accepted friend, aggregates their FINISHED sessions since `since`
+    (count, focus time, best score, last activity). Friends with nothing since
+    `since` come back as idle (`active: false`) so the client can offer a nudge.
+    Defaults to the last 7 days when `since` is missing/invalid, and never looks
+    back more than 30 days (keeps the query + payload small on the free tier).
+    """
+    db = get_supabase()
+    now = datetime.now(timezone.utc)
+
+    since_dt = None
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            if since_dt.tzinfo is None:
+                since_dt = since_dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            since_dt = None
+    if since_dt is None:
+        since_dt = now - timedelta(days=7)
+    floor = now - timedelta(days=30)
+    if since_dt < floor:
+        since_dt = floor
+    if since_dt > now:
+        since_dt = now
+
+    friend_ids = await _get_friend_ids(user["id"])
+    if not friend_ids:
+        return {
+            "since": since_dt,
+            "generated_at": now,
+            "active_count": 0,
+            "idle_count": 0,
+            "items": [],
+        }
+
+    # Friend identities + buddy flavor (one query each, batched by id).
+    profs = db.table("profiles").select("id, display_name, avatar_url").in_("id", friend_ids).execute()
+    prof_map = {p["id"]: p for p in (profs.data or [])}
+
+    buds = db.table("buddies").select("user_id, buddy_name, buddy_type, mood_level").in_("user_id", friend_ids).execute()
+    bud_map = {b["user_id"]: b for b in (buds.data or [])}
+
+    # All friends' finished sessions since `since`, with scores, in one query.
+    sess = db.table("sessions") \
+        .select("user_id, total_seconds, finished_at, ai_scores(score)") \
+        .in_("user_id", friend_ids) \
+        .eq("status", "finished") \
+        .gte("finished_at", since_dt.isoformat()) \
+        .order("finished_at", desc=True) \
+        .range(0, 4999) \
+        .execute()  # explicit cap (matches PostgREST's implicit max) — ample for this scale
+
+    agg: dict[str, dict] = {}
+    for row in (sess.data or []):
+        fid = row["user_id"]
+        a = agg.setdefault(fid, {"count": 0, "seconds": 0, "best": None, "last": None})
+        a["count"] += 1
+        a["seconds"] += row.get("total_seconds") or 0
+        ai = row.get("ai_scores")
+        score = None
+        if isinstance(ai, list) and ai:
+            score = ai[0].get("score")
+        elif isinstance(ai, dict) and ai:
+            score = ai.get("score")
+        if score is not None:
+            a["best"] = score if a["best"] is None else max(a["best"], score)
+        fin = row.get("finished_at")
+        if fin and (a["last"] is None or fin > a["last"]):
+            a["last"] = fin
+
+    items = []
+    for fid in friend_ids:
+        prof = prof_map.get(fid, {})
+        bud = bud_map.get(fid, {})
+        a = agg.get(fid)
+        items.append({
+            "friend_id": fid,
+            "friend_name": prof.get("display_name"),
+            "friend_avatar": prof.get("avatar_url"),
+            "buddy_name": bud.get("buddy_name"),
+            "buddy_type": bud.get("buddy_type"),
+            "mood_level": bud.get("mood_level"),
+            "sessions_count": a["count"] if a else 0,
+            "total_seconds": a["seconds"] if a else 0,
+            "best_score": a["best"] if a else None,
+            "last_finished_at": a["last"] if a else None,
+            "active": bool(a and a["count"] > 0),
+        })
+
+    # Active first (most sessions, then most recent), idle after.
+    items.sort(
+        key=lambda i: (i["active"], i["sessions_count"], i["last_finished_at"] or ""),
+        reverse=True,
+    )
+
+    active_count = sum(1 for i in items if i["active"])
+    return {
+        "since": since_dt,
+        "generated_at": now,
+        "active_count": active_count,
+        "idle_count": len(items) - active_count,
+        "items": items,
+    }
 
 
 @router.post("/request", response_model=FriendResponse)

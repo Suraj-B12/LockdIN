@@ -5,11 +5,19 @@
    here (limit 20) and shared into the streak / score / recent cards so the
    weekly bars and lifetime totals are accurate without refetching.
    ===================================================================== */
-import { useMemo } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Card } from "@/components/ui";
-import { useProfile, useHistory, useBuddy } from "@/lib/queries";
+import { RecapInbox } from "@/components/RecapInbox";
+import { useProfile, useHistory, useBuddy, useFriendsActivity } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
+import {
+  getRecapLastSeen,
+  setRecapLastSeen,
+  recapShownThisSession,
+  markRecapShownThisSession,
+  defaultSince,
+} from "@/lib/recap";
 import { revealStagger, revealItem } from "@/lib/motion";
 // NOTE: import the subcomponents by their explicit file paths. The folder
 // `pages/dashboard/` and this file `pages/Dashboard.tsx` differ only in case,
@@ -44,6 +52,36 @@ export function Dashboard() {
   }, [profile?.display_name, profile?.email, user]);
 
   const sub = useMemo(() => subgreeting(), []);
+
+  // ---- "While you were gone" friend recap ----
+  const userId = user?.id;
+  // Capture the look-back window ONCE (last catch-up, or 7d for a first visit)
+  // so it stays stable across re-renders and the query key doesn't churn.
+  const [recapSince] = useState(
+    () => (userId ? getRecapLastSeen(userId) : null) ?? defaultSince()
+  );
+  const { data: recap } = useFriendsActivity(recapSince, { enabled: !!userId });
+  const [recapOpen, setRecapOpen] = useState(false);
+
+  useEffect(() => {
+    if (!userId || !recap || recapShownThisSession()) return;
+    const returning = !!getRecapLastSeen(userId);
+    // Auto-open when friends were productive, or (for returning users) when
+    // there are quiet friends worth nudging. Never nag first-time users with an
+    // all-idle list, and never open with zero friends.
+    const worthShowing = recap.active_count > 0 || (returning && recap.idle_count > 0);
+    if (worthShowing && recap.items.length > 0) {
+      setRecapOpen(true);
+      markRecapShownThisSession();
+      // Mark this as the catch-up point even if they navigate away without closing.
+      setRecapLastSeen(userId, new Date().toISOString());
+    }
+  }, [userId, recap]);
+
+  const closeRecap = () => {
+    setRecapOpen(false);
+    if (userId) setRecapLastSeen(userId, new Date().toISOString());
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1180px]">
@@ -111,6 +149,11 @@ export function Dashboard() {
           </Card>
         </Cell>
       </motion.div>
+
+      {/* "While you were gone" friend recap (auto-opens once per session) */}
+      <AnimatePresence>
+        {recapOpen && recap && <RecapInbox data={recap} onClose={closeRecap} />}
+      </AnimatePresence>
     </div>
   );
 }

@@ -87,6 +87,29 @@ export interface FriendActionBody {
   action: FriendAction;
 }
 
+/* ---- Friend activity recap ("while you were gone" inbox) ---- */
+export interface FriendActivityItem {
+  friend_id: string;
+  friend_name: string | null;
+  friend_avatar: string | null;
+  buddy_name: string | null;
+  buddy_type: string | null;
+  mood_level: number | null;
+  sessions_count: number;
+  total_seconds: number;
+  best_score: number | null;
+  last_finished_at: string | null;
+  active: boolean;
+}
+
+export interface FriendActivityResponse {
+  since: string;
+  generated_at: string;
+  active_count: number;
+  idle_count: number;
+  items: FriendActivityItem[];
+}
+
 /* ---- Notifications ---- */
 export interface NotificationPreferences {
   user_id: string;
