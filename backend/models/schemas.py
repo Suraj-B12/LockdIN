@@ -111,6 +111,9 @@ class FriendProfileResponse(BaseModel):
     last_active_at: datetime
     buddy: Optional[BuddyResponse] = None
     sessions: list[SessionResponse] = Field(default_factory=list)
+    # Current shared streak with the VIEWER (days you both completed). None when
+    # viewing your own overview.
+    shared_streak: Optional[int] = None
 
 
 # ========== FRIENDS ==========

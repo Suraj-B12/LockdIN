@@ -162,6 +162,8 @@ export interface FriendProfileResponse {
   last_active_at: string;
   buddy: BuddyResponse | null;
   sessions: SessionResponse[];
+  /** Current shared streak with you (days you both completed). null on your own. */
+  shared_streak?: number | null;
 }
 
 /* ---- Auth ---- */

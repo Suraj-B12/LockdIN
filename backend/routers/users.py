@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
-from services.streak_calculator import refresh_streak_for_user
+from services.streak_calculator import refresh_streak_for_user, calculate_shared_streak
 from services.cache import cache_get, cache_set
 from models.schemas import ProfileResponse, ProfileUpdate, FriendProfileResponse
 
@@ -163,6 +163,12 @@ async def get_user_overview(user_id: str, user: dict = Depends(get_current_user)
             row["ai_summary"] = ai["summary"]
         sessions.append(row)
 
+    # Shared streak with the viewer (days you both completed) — only meaningful
+    # when viewing a FRIEND, not your own overview.
+    shared_streak = None
+    if user_id != user["id"]:
+        shared_streak = calculate_shared_streak(user["id"], user_id)
+
     return {
         "id": p["id"],
         "display_name": p["display_name"],
@@ -171,4 +177,5 @@ async def get_user_overview(user_id: str, user: dict = Depends(get_current_user)
         "last_active_at": p["last_active_at"],
         "buddy": buddy,
         "sessions": sessions,
+        "shared_streak": shared_streak,
     }

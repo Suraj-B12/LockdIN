@@ -57,6 +57,45 @@ def calculate_streak(user_id: str) -> dict:
     return {"current_streak": current_streak, "longest_streak": longest_streak}
 
 
+def calculate_shared_streak(user_a: str, user_b: str) -> int:
+    """Current shared streak between two users: consecutive days (ending today or
+    yesterday) on which BOTH completed a session. Computed on read from the
+    `streaks` table — no extra storage. Best-effort: returns 0 on any error."""
+    db = get_supabase()
+    try:
+        a = db.table("streaks").select("streak_date") \
+            .eq("user_id", user_a).eq("completed", True).execute()
+        b = db.table("streaks").select("streak_date") \
+            .eq("user_id", user_b).eq("completed", True).execute()
+        if not a.data or not b.data:
+            return 0
+
+        common = {r["streak_date"] for r in a.data} & {r["streak_date"] for r in b.data}
+        if not common:
+            return 0
+
+        dates = sorted((date.fromisoformat(d) for d in common), reverse=True)
+        today = date.today()
+        if dates[0] == today:
+            expected = today
+        elif dates[0] == today - timedelta(days=1):
+            expected = today - timedelta(days=1)
+        else:
+            return 0
+
+        streak = 0
+        for d in dates:
+            if d == expected:
+                streak += 1
+                expected -= timedelta(days=1)
+            else:
+                break
+        return streak
+    except Exception:
+        log.warning("shared-streak calc failed for %s/%s", user_a, user_b, exc_info=True)
+        return 0
+
+
 def _calculate_longest(dates: list[date]) -> int:
     """Find the longest consecutive streak in a list of dates."""
     if not dates:

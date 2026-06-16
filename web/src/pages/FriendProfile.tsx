@@ -12,6 +12,7 @@ import {
   WarningCircle,
   Fire,
   Trophy,
+  Handshake,
   ClockCounterClockwise,
   type Icon,
 } from "@phosphor-icons/react";
@@ -82,10 +83,20 @@ export function FriendProfile() {
                     <p className="mt-1.5 text-sm text-ink-muted">
                       Member since {memberSince(data.created_at)}
                     </p>
-                    {data.buddy && (
+                    {(data.buddy || (data.shared_streak ?? 0) > 0) && (
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <Chip icon={Fire} label={`${data.buddy.current_streak}-day streak`} />
-                        <Chip icon={Trophy} label={`Best ${data.buddy.longest_streak}`} />
+                        {data.buddy && (
+                          <Chip icon={Fire} label={`${data.buddy.current_streak}-day streak`} />
+                        )}
+                        {data.buddy && (
+                          <Chip icon={Trophy} label={`Best ${data.buddy.longest_streak}`} />
+                        )}
+                        {data.shared_streak != null && data.shared_streak > 0 && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-teal px-3 py-1 text-xs font-semibold text-canvas">
+                            <Handshake weight="fill" className="h-3.5 w-3.5" />
+                            {data.shared_streak}-day streak with you
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
