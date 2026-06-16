@@ -4,12 +4,18 @@
    and ringed. Privacy-framed: the buddy mirrors YOUR consistency, never
    compares you to anyone.
    ===================================================================== */
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Flame } from "@phosphor-icons/react";
+import { Flame, PencilSimple, Check, X } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui";
+import { useUpdateBuddy } from "@/lib/queries";
 import { getBuddyAvatar, moodLabel, moodEmoji, MOOD_MIN, MOOD_MAX } from "@/lib/buddy";
 import type { BuddyResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
+
+/** Matches the backend cap (BuddyUpdate.buddy_name max_length=30). */
+const MAX_NAME = 30;
 
 interface BuddyCardProps {
   buddy: BuddyResponse;
@@ -26,8 +32,13 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs uppercase tracking-eyebrow text-ink-faint">Your buddy</p>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2/70 px-2.5 py-1 text-xs font-medium text-ink-soft ring-1 ring-inset ring-hairline/10 tabular">
-          <Flame weight="fill" className="h-3.5 w-3.5 text-teal-bright" />
-          {buddy.current_streak}-day streak
+          <Flame
+            weight={buddy.current_streak > 0 ? "fill" : "regular"}
+            className={buddy.current_streak > 0 ? "h-3.5 w-3.5 text-teal-bright" : "h-3.5 w-3.5 text-ink-faint"}
+          />
+          {buddy.current_streak > 0
+            ? `${buddy.current_streak}-day streak`
+            : "Start a new streak"}
         </span>
       </div>
 
@@ -47,9 +58,7 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
         </div>
 
         <div className="min-w-0">
-          <h3 className="truncate font-display text-2xl tracking-tightest text-ink">
-            {buddy.buddy_name || "Buddy"}
-          </h3>
+          <BuddyNameEditor buddy={buddy} />
           <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-soft">
             <span aria-hidden className="text-base leading-none">
               {moodEmoji(mood)}
@@ -111,5 +120,130 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
         </div>
       </div>
     </Card>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Inline buddy-name editor — the buddy's name is theirs to change. Tap the
+   pencil to swap the heading for a field; Enter / ✓ saves (PUT /buddy/), Esc /
+   ✕ cancels. The mutation updates the buddy query so the new name propagates
+   everywhere the user's OWN buddy is shown (dashboard + profile cards) without a
+   refetch.
+   ------------------------------------------------------------------------- */
+function BuddyNameEditor({ buddy }: { buddy: BuddyResponse }) {
+  const updateBuddy = useUpdateBuddy();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(buddy.buddy_name || "");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const saving = updateBuddy.isPending;
+
+  // If the name changes elsewhere while we're not editing, stay in sync.
+  useEffect(() => {
+    if (!editing) setName(buddy.buddy_name || "");
+  }, [buddy.buddy_name, editing]);
+
+  // Focus + select the field when the editor opens.
+  useEffect(() => {
+    if (!editing) return;
+    const t = window.setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 30);
+    return () => window.clearTimeout(t);
+  }, [editing]);
+
+  const trimmed = name.trim();
+  const valid = trimmed.length > 0 && trimmed.length <= MAX_NAME;
+  const changed = trimmed !== (buddy.buddy_name || "");
+
+  const cancel = () => {
+    // Always reachable, even mid-save: drop any in-flight mutation state so the
+    // user is never trapped waiting on a slow free-tier request.
+    updateBuddy.reset();
+    setName(buddy.buddy_name || "");
+    setEditing(false);
+  };
+
+  const save = () => {
+    if (!valid) return;
+    if (!changed) {
+      setEditing(false);
+      return;
+    }
+    updateBuddy.mutate(
+      { buddy_name: trimmed },
+      {
+        onSuccess: () => {
+          setEditing(false);
+          toast.success("Buddy renamed.");
+        },
+        onError: () => toast.error("Couldn't rename your buddy. Please try again."),
+      }
+    );
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <h3 className="truncate font-display text-2xl tracking-tightest text-ink">
+          {buddy.buddy_name || "Buddy"}
+        </h3>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label="Rename your buddy"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-muted transition-colors duration-200 hover:bg-surface-2/70 hover:text-teal-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55"
+        >
+          <PencilSimple weight="bold" className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={inputRef}
+        value={name}
+        onChange={(e) => setName(e.target.value.slice(0, MAX_NAME))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            cancel();
+          }
+        }}
+        maxLength={MAX_NAME}
+        disabled={saving}
+        aria-label="Buddy name"
+        autoComplete="off"
+        spellCheck={false}
+        className="h-10 min-w-0 flex-1 rounded-xl bg-surface-2/80 px-3 font-display text-xl text-ink ring-1 ring-inset ring-hairline/10 transition-[box-shadow,background-color] duration-200 placeholder:text-ink-faint focus:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-teal/55 disabled:opacity-60"
+        placeholder="Name your buddy…"
+      />
+      <button
+        type="button"
+        onClick={save}
+        disabled={!valid || saving}
+        aria-label="Save name"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-teal text-canvas transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {saving ? (
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-canvas/30 border-t-canvas" />
+        ) : (
+          <Check weight="bold" className="h-4 w-4" />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={cancel}
+        aria-label="Cancel rename"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-muted ring-1 ring-inset ring-hairline/10 transition-colors duration-200 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/55"
+      >
+        <X weight="bold" className="h-4 w-4" />
+      </button>
+    </div>
   );
 }

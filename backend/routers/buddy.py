@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
+from services.streak_calculator import refresh_streak_for_user
 from models.schemas import BuddyResponse, BuddyUpdate
 
 router = APIRouter(prefix="/api/buddy", tags=["Buddy"])
@@ -17,7 +18,9 @@ async def get_my_buddy(user: dict = Depends(get_current_user)):
     if not result.data:
         raise HTTPException(status_code=404, detail="Buddy not found. This shouldn't happen!")
 
-    return result.data[0]
+    # Self-heal: streak counters are only written on session finish, so a missed
+    # day would leave a stale `current_streak`. Recompute live before returning.
+    return refresh_streak_for_user(user["id"], buddy_row=result.data[0])
 
 
 @router.put("/", response_model=BuddyResponse)
@@ -34,7 +37,9 @@ async def update_my_buddy(body: BuddyUpdate, user: dict = Depends(get_current_us
     if not result.data:
         raise HTTPException(status_code=404, detail="Buddy not found.")
 
-    return result.data[0]
+    # Heal the streak on the way out so a rename never repopulates the client
+    # cache with a stale current_streak.
+    return refresh_streak_for_user(user["id"], buddy_row=result.data[0])
 
 
 @router.get("/friend/{friend_id}", response_model=BuddyResponse)
@@ -61,4 +66,8 @@ async def get_friend_buddy(friend_id: str, user: dict = Depends(get_current_user
     if not result.data:
         raise HTTPException(status_code=404, detail="Buddy not found.")
 
-    return result.data[0]
+    # Show the friend's live streak, but DON'T write their row from our read
+    # (persist=False) — only the owner's own read or the cron heals the row.
+    return refresh_streak_for_user(
+        friend_id, buddy_row=result.data[0], persist=(friend_id == user["id"])
+    )

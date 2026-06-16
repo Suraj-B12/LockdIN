@@ -28,3 +28,9 @@ node_modules/
 .agents/
 .mcp.json
 skills-lock.json
+
+# Local-only project brief for new sessions — NEVER commit
+PROJECT_CONTEXT.md
+
+# Local-only product research / roadmap — not part of the app
+FEATURE_ROADMAP.md

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
+from services.streak_calculator import refresh_streak_for_user
 from services.cache import cache_get, cache_set
 from models.schemas import ProfileResponse, ProfileUpdate, FriendProfileResponse
 
@@ -129,9 +130,17 @@ async def get_user_overview(user_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="User not found.")
     p = prof.data[0]
 
-    # Buddy — tolerate absence (a brand-new account may not have one yet).
+    # Buddy — tolerate absence (a brand-new account may not have one yet). Show
+    # the live streak, but only PERSIST the heal when viewing your OWN overview;
+    # a friend viewing yours computes fresh without writing your row.
     bud = db.table("buddies").select("*").eq("user_id", user_id).execute()
-    buddy = bud.data[0] if bud.data else None
+    buddy = (
+        refresh_streak_for_user(
+            user_id, buddy_row=bud.data[0], persist=(user_id == user["id"])
+        )
+        if bud.data
+        else None
+    )
 
     # Finished sessions, newest first, each with its AI score. One generous batch
     # (mirrors History's 200) so the client can render the full 12-week heatmap.

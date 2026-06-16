@@ -1,11 +1,12 @@
 /* =====================================================================
-   StreakCard — current + longest streak (from the buddy), a 7-day mini bar
-   visual built from real session history (minutes focused per weekday, this
-   week, Mon→Sun), and lifetime totals (sessions + hours) derived from history.
+   StreakCard — current + best (longest) streak shown side by side at the top
+   (from the buddy, recomputed live server-side so a missed day resets it), a
+   7-day mini bar visual built from real session history (minutes focused per
+   weekday, this week, Mon→Sun), and lifetime totals derived from history.
    ===================================================================== */
 import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Flame } from "@phosphor-icons/react";
+import { Flame, Trophy, type Icon } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui";
 import type { BuddyResponse, SessionResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
@@ -53,35 +54,46 @@ export function StreakCard({ buddy, buddyLoading, sessions, sessionsLoading }: S
 
   const current = buddy?.current_streak ?? 0;
   const longest = buddy?.longest_streak ?? 0;
+  // Best is at least the current run (a live streak is, by definition, a record
+  // in progress) — guards against any momentary lag in the stored longest.
+  const best = Math.max(longest, current);
+  const weekMinutes = useMemo(() => minutes.reduce((a, m) => a + m, 0), [minutes]);
 
+  const atRecord = current > 0 && current === best;
+  const toBeat = best - current + 1; // days needed to set a new record
   const subtitle =
     current === 0
       ? "Finish a session to start your streak."
       : current === 1
         ? "Day one — keep it going."
-        : `${current} days strong.`;
+        : atRecord
+          ? "On your best run yet."
+          : `${toBeat} ${toBeat === 1 ? "day" : "days"} to a new record.`;
 
   return (
     <div className="flex h-full flex-col">
       <CardHead icon={Flame} label="Streak" />
 
-      {/* Big number */}
-      <div className="mt-4 flex items-end gap-2.5">
-        {buddyLoading ? (
-          <Skeleton className="h-12 w-24" />
-        ) : (
-          <>
-            <Flame weight="fill" className="mb-1 h-7 w-7 text-warning" />
-            <span className="font-mono text-5xl font-semibold tabular leading-none text-ink">
-              {current}
-            </span>
-            <span className="mb-1 text-sm text-ink-muted">
-              {current === 1 ? "day" : "days"}
-            </span>
-          </>
-        )}
+      {/* Current + Best, side by side — the two numbers that matter most. */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <StreakStat
+          icon={Flame}
+          iconClassName="text-warning"
+          label="Current"
+          value={current}
+          loading={buddyLoading}
+          highlight
+        />
+        <StreakStat
+          icon={Trophy}
+          iconClassName="text-teal-bright"
+          label="Best"
+          value={best}
+          loading={buddyLoading}
+          tag={atRecord ? "Record" : undefined}
+        />
       </div>
-      <p className="mt-2 text-sm text-ink-muted">{subtitle}</p>
+      <p className="mt-3 text-sm text-ink-muted">{subtitle}</p>
 
       {/* 7-day mini bars */}
       <div className="mt-6">
@@ -128,11 +140,6 @@ export function StreakCard({ buddy, buddyLoading, sessions, sessionsLoading }: S
       {/* Totals */}
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-hairline/[0.07] pt-5">
         <Stat
-          value={buddyLoading ? "—" : longest}
-          label="Longest"
-          valueClassName="text-xl"
-        />
-        <Stat
           value={sessionsLoading ? "—" : totalSessions}
           label="Sessions"
           valueClassName="text-xl"
@@ -142,6 +149,66 @@ export function StreakCard({ buddy, buddyLoading, sessions, sessionsLoading }: S
           label="Focused"
           valueClassName="text-xl"
         />
+        <Stat
+          value={sessionsLoading ? "—" : `${weekMinutes}m`}
+          label="This week"
+          valueClassName="text-xl"
+        />
+      </div>
+    </div>
+  );
+}
+
+/** One half of the current/best streak pair — icon + big number + "days". */
+function StreakStat({
+  icon: IconCmp,
+  iconClassName,
+  label,
+  value,
+  loading,
+  highlight = false,
+  tag,
+}: {
+  icon: Icon;
+  iconClassName: string;
+  label: string;
+  value: number;
+  loading: boolean;
+  highlight?: boolean;
+  /** Optional pill after the label (e.g. "Record" when current === best). */
+  tag?: string;
+}) {
+  return (
+    <div
+      className={
+        "rounded-2xl px-4 py-3.5 ring-1 ring-inset " +
+        (highlight
+          ? "bg-teal/[0.06] ring-teal/15"
+          : "bg-surface-3/30 ring-hairline/[0.07]")
+      }
+    >
+      <div className="flex items-center gap-1.5">
+        <IconCmp weight="fill" className={"h-4 w-4 " + iconClassName} />
+        <span className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-faint">
+          {label}
+        </span>
+        {tag && !loading && (
+          <span className="ml-auto rounded-full bg-teal/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide text-teal-bright">
+            {tag}
+          </span>
+        )}
+      </div>
+      <div className="mt-2 flex items-end gap-1.5">
+        {loading ? (
+          <Skeleton className="h-9 w-14" />
+        ) : (
+          <>
+            <span className="font-mono text-4xl font-semibold tabular leading-none text-ink">
+              {value}
+            </span>
+            <span className="mb-0.5 text-xs text-ink-muted">{value === 1 ? "day" : "days"}</span>
+          </>
+        )}
       </div>
     </div>
   );

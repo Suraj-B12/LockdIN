@@ -16,7 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from services.supabase_client import get_supabase
-from services.streak_calculator import get_mood_level
+from services.streak_calculator import get_mood_level, decay_stale_streaks
 
 log = logging.getLogger(__name__)
 
@@ -149,6 +149,14 @@ async def check_buddy_mood_alerts() -> None:
 
     log.info("[scheduler] Running buddy mood alert check...")
     db = get_supabase()
+
+    # First decay any streaks that broke since the user's last session, so the
+    # mood_level==1 query below sees freshly-devastated buddies. Without this,
+    # mood only ever updates on session finish — and a user who simply STOPS
+    # would never trip the alert. Cheap: only touches buddies that can be stale.
+    corrected = decay_stale_streaks()
+    if corrected:
+        log.info(f"[scheduler] Decayed {corrected} stale streak(s) before mood check.")
 
     result = db.table("buddies") \
         .select("user_id, buddy_name, mood_level, longest_streak, last_session_date") \
