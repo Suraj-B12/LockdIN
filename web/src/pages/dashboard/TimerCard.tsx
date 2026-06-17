@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { Play, Pause, Flag, ArrowClockwise } from "@phosphor-icons/react";
+import { Play, Pause, Flag, ArrowClockwise, Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import {
@@ -17,11 +17,13 @@ import {
   usePauseSession,
   useResumeSession,
   useFinishSession,
+  useCancelSession,
 } from "@/lib/queries";
 import type { SessionResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { formatClock, formatDuration, scoreToneClass } from "./utils";
 import { WorkLogSheet } from "./WorkLogSheet";
+import { CancelSessionDialog } from "./CancelSessionDialog";
 import { celebrate } from "@/lib/celebrate";
 
 /** Seconds the ring loops over — a visual "sweep", not a hard goal (60 min). */
@@ -42,8 +44,10 @@ export function TimerCard() {
   const pause = usePauseSession();
   const resume = useResumeSession();
   const finish = useFinishSession();
+  const cancel = useCancelSession();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   // Elapsed time FROZEN at the instant Finish is clicked — the log sheet shows
   // this, not the still-running live timer, so the duration stops climbing.
   const [frozenSeconds, setFrozenSeconds] = useState(0);
@@ -103,7 +107,8 @@ export function TimerCard() {
     return (displaySeconds % RING_PERIOD) / RING_PERIOD;
   }, [displaySeconds, session]);
 
-  const busy = start.isPending || pause.isPending || resume.isPending || finish.isPending;
+  const busy =
+    start.isPending || pause.isPending || resume.isPending || finish.isPending || cancel.isPending;
 
   // ---- Actions -----------------------------------------------------------
   function handleStart() {
@@ -134,6 +139,24 @@ export function TimerCard() {
     resume.mutate(session.id, {
       onError: (err) =>
         toast.error(err instanceof Error ? err.message : "Couldn't resume the session."),
+    });
+  }
+
+  function handleCancelConfirm() {
+    if (!session) return;
+    cancel.mutate(session.id, {
+      onSuccess: () => {
+        setCancelOpen(false);
+        toast.message("Session discarded", { description: "No time was saved." });
+      },
+      onError: (err) => {
+        if (err instanceof ApiError && err.status === 409) {
+          setCancelOpen(false);
+          toast.message("Nothing to discard", { description: "That session was already gone." });
+        } else {
+          toast.error(err instanceof Error ? err.message : "Couldn't discard the session.");
+        }
+      },
     });
   }
 
@@ -301,6 +324,21 @@ export function TimerCard() {
             </>
           )}
         </div>
+
+        {/* Discard — de-emphasised escape hatch for an accidental start. */}
+        {(isActive || isPaused) && (
+          <div className="mt-4 flex justify-center sm:justify-start">
+            <button
+              type="button"
+              onClick={() => setCancelOpen(true)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs text-ink-faint transition-colors duration-200 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50 disabled:opacity-50"
+            >
+              <Trash weight="bold" className="h-3.5 w-3.5" />
+              Discard session
+            </button>
+          </div>
+        )}
       </div>
 
       <WorkLogSheet
@@ -311,6 +349,16 @@ export function TimerCard() {
           if (!finish.isPending) setSheetOpen(false);
         }}
         onSubmit={handleFinishSubmit}
+      />
+
+      <CancelSessionDialog
+        open={cancelOpen}
+        elapsedSeconds={displaySeconds}
+        discarding={cancel.isPending}
+        onClose={() => {
+          if (!cancel.isPending) setCancelOpen(false);
+        }}
+        onConfirm={handleCancelConfirm}
       />
     </>
   );

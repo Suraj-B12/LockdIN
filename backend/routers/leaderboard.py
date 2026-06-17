@@ -4,10 +4,95 @@ from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user
 from services.supabase_client import get_supabase
 from services.cache import cache_get, cache_set
-from models.schemas import LeaderboardResponse, LeaderboardEntry
+from models.schemas import LeaderboardResponse, GlobalLeaderboardResponse
 from datetime import date, timedelta
 
 router = APIRouter(prefix="/api/leaderboard", tags=["Leaderboard"])
+
+
+def _period_query(db, period: str, today: date, user_ids: list[str] | None):
+    """Build the streaks query for a period. If user_ids is given, scope to them
+    (friends board); otherwise scan everyone (global board)."""
+    sel = db.table("streaks").select("user_id, daily_score, daily_seconds")
+    if user_ids is not None:
+        sel = sel.in_("user_id", user_ids)
+    if period == "daily":
+        sel = sel.eq("streak_date", today.isoformat())
+    elif period == "weekly":
+        week_start = (today - timedelta(days=today.weekday())).isoformat()
+        sel = sel.gte("streak_date", week_start)
+    return sel
+
+
+@router.get("/global/{period}", response_model=GlobalLeaderboardResponse)
+async def get_global_leaderboard(period: str, user: dict = Depends(get_current_user)):
+    """Global leaderboard across ALL users (not just friends), with each entry's
+    relationship to the viewer so the client can offer "Add friend". Top 50."""
+    if period not in ("daily", "weekly", "alltime"):
+        raise HTTPException(status_code=400, detail="Period must be: daily, weekly, or alltime")
+
+    today = date.today()
+    cache_key = f"lbglobal:{period}:{user['id']}:{today.isoformat()}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
+    db = get_supabase()
+
+    # Aggregate scores across everyone for the period (explicit row cap).
+    rows = _period_query(db, period, today, None).range(0, 4999).execute()
+    totals: dict[str, dict] = {}
+    for r in rows.data or []:
+        t = totals.setdefault(r["user_id"], {"total_score": 0, "total_seconds": 0})
+        t["total_score"] += r["daily_score"]
+        t["total_seconds"] += r["daily_seconds"]
+
+    ranked = sorted(totals.items(), key=lambda kv: kv[1]["total_score"], reverse=True)
+
+    # Viewer's rank within the FULL ranked list (even if outside the top 50).
+    your_rank = next((i + 1 for i, (uid, _) in enumerate(ranked) if uid == user["id"]), None)
+
+    top = ranked[:50]
+    top_ids = [uid for uid, _ in top]
+
+    # Profiles for the shown rows.
+    profile_map = {}
+    if top_ids:
+        profs = db.table("profiles").select("id, display_name, avatar_url").in_("id", top_ids).execute()
+        profile_map = {p["id"]: p for p in (profs.data or [])}
+
+    # The viewer's relationship to each shown user (any-status friendships).
+    status_map: dict[str, str] = {}
+    fr = db.table("friendships") \
+        .select("user_id, friend_id, status") \
+        .or_(f"user_id.eq.{user['id']},friend_id.eq.{user['id']}") \
+        .execute()
+    for row in fr.data or []:
+        other = row["friend_id"] if row["user_id"] == user["id"] else row["user_id"]
+        st = row["status"]
+        if st == "accepted":
+            status_map[other] = "friends"
+        elif st == "blocked":
+            status_map[other] = "blocked"
+        elif st == "pending":
+            status_map[other] = "pending_out" if row["user_id"] == user["id"] else "pending_in"
+
+    entries = []
+    for i, (uid, sc) in enumerate(top):
+        p = profile_map.get(uid, {})
+        entries.append({
+            "user_id": uid,
+            "display_name": p.get("display_name", "Anonymous"),
+            "avatar_url": p.get("avatar_url"),
+            "total_score": sc["total_score"],
+            "total_seconds": sc["total_seconds"],
+            "rank": i + 1,
+            "friend_status": "self" if uid == user["id"] else status_map.get(uid, "none"),
+        })
+
+    response = {"period": period, "entries": entries, "your_rank": your_rank}
+    await cache_set(cache_key, response, ttl_seconds=180)  # 3 min
+    return response
 
 
 @router.get("/{period}", response_model=LeaderboardResponse)

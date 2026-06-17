@@ -65,6 +65,25 @@ export interface LeaderboardResponse {
   your_rank: number | null;
 }
 
+/* ---- Global leaderboard (all users) ---- */
+export type FriendStatusTag =
+  | "self"
+  | "friends"
+  | "pending_out"
+  | "pending_in"
+  | "blocked"
+  | "none";
+
+export interface GlobalLeaderboardEntry extends LeaderboardEntry {
+  friend_status: FriendStatusTag;
+}
+
+export interface GlobalLeaderboardResponse {
+  period: LeaderboardPeriod;
+  entries: GlobalLeaderboardEntry[];
+  your_rank: number | null;
+}
+
 /* ---- Friends ---- */
 export type FriendStatus = "pending" | "accepted" | "blocked" | "rejected";
 
@@ -81,6 +100,7 @@ export interface FriendResponse {
 export interface FriendRequestBody {
   invite_code?: string;
   email?: string;
+  user_id?: string;
 }
 
 export type FriendAction = "accept" | "reject" | "block";

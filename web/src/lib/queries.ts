@@ -16,6 +16,7 @@ import type {
   BuddyResponse,
   UpdateBuddyBody,
   LeaderboardResponse,
+  GlobalLeaderboardResponse,
   LeaderboardPeriod,
   FriendResponse,
   FriendRequestBody,
@@ -36,6 +37,7 @@ export const qk = {
   buddy: ["buddy", "me"] as const,
   friendBuddy: (friendId: string) => ["buddy", "friend", friendId] as const,
   leaderboard: (period: LeaderboardPeriod) => ["leaderboard", period] as const,
+  globalLeaderboard: (period: LeaderboardPeriod) => ["leaderboard", "global", period] as const,
   friends: ["friends", "list"] as const,
   friendsPending: ["friends", "pending"] as const,
   friendsSent: ["friends", "sent"] as const,
@@ -119,6 +121,17 @@ export function useFinishSession() {
   });
 }
 
+/** DELETE /sessions/{id} — discard an in-progress session (no score/streak). */
+export function useCancelSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ ok: boolean }>(`/sessions/${id}`),
+    onSuccess: () => {
+      qc.setQueryData(qk.activeSession, null);
+    },
+  });
+}
+
 /* =====================================================================
    Buddy
    ===================================================================== */
@@ -159,6 +172,16 @@ export function useLeaderboard(period: LeaderboardPeriod) {
   return useQuery({
     queryKey: qk.leaderboard(period),
     queryFn: ({ signal }) => api.get<LeaderboardResponse>(`/leaderboard/${period}`, { signal }),
+  });
+}
+
+/** GET /leaderboard/global/{period} → GlobalLeaderboardResponse (top 50, all users). */
+export function useGlobalLeaderboard(period: LeaderboardPeriod, enabled = true) {
+  return useQuery({
+    queryKey: qk.globalLeaderboard(period),
+    queryFn: ({ signal }) =>
+      api.get<GlobalLeaderboardResponse>(`/leaderboard/global/${period}`, { signal }),
+    enabled,
   });
 }
 
@@ -211,7 +234,7 @@ export function useFriendsActivity(
   });
 }
 
-/** POST /friends/request {invite_code?|email?} → FriendResponse (idempotent). */
+/** POST /friends/request {invite_code?|email?|user_id?} → FriendResponse (idempotent). */
 export function useSendFriendRequest() {
   const qc = useQueryClient();
   return useMutation({
@@ -220,6 +243,8 @@ export function useSendFriendRequest() {
       qc.invalidateQueries({ queryKey: qk.friends });
       qc.invalidateQueries({ queryKey: qk.friendsPending });
       qc.invalidateQueries({ queryKey: qk.friendsSent });
+      // Global board shows per-row friend status → refresh it too.
+      qc.invalidateQueries({ queryKey: ["leaderboard", "global"] });
     },
   });
 }

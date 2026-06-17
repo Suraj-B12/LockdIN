@@ -276,6 +276,32 @@ async def _upgrade_score_with_llm(
         print(f"[ai] Background LLM scoring failed for session {session_id}: {e}")
 
 
+@router.delete("/{session_id}")
+async def cancel_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Discard an IN-PROGRESS (active or paused) session entirely — no score, no
+    streak, no notification. For sessions started by accident. A finished session
+    can't be cancelled (it's already part of your history)."""
+    db = get_supabase()
+    session = _get_user_session(db, session_id, user["id"])
+
+    if session["status"] == "finished":
+        raise HTTPException(status_code=400, detail="A finished session can't be cancelled.")
+
+    # Re-assert the status in the WHERE clause so a concurrent finish can't race
+    # us into deleting a now-finished (scored) session.
+    result = db.table("sessions") \
+        .delete() \
+        .eq("id", session_id) \
+        .eq("user_id", user["id"]) \
+        .in_("status", ["active", "paused"]) \
+        .execute()
+
+    if not result.data:
+        raise HTTPException(status_code=409, detail="Session is no longer cancellable.")
+
+    return {"ok": True, "message": "Session discarded."}
+
+
 @router.get("/active", response_model=SessionResponse | None)
 async def get_active_session(user: dict = Depends(get_current_user)):
     """Get the user's current active or paused session (if any)."""

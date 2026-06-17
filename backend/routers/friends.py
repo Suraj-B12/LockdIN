@@ -222,23 +222,28 @@ async def send_friend_request(body: FriendRequest, user: dict = Depends(get_curr
     # Normalize inputs and require at least one NON-EMPTY string.
     invite_code = (body.invite_code or "").strip()
     email = (body.email or "").strip()
+    user_id_in = (body.user_id or "").strip()
 
-    if not invite_code and not email:
+    if not invite_code and not email and not user_id_in:
         raise HTTPException(
             status_code=400,
-            detail="Provide a non-empty invite_code or email.",
+            detail="Provide a non-empty invite_code, email, or user_id.",
         )
 
-    # Early self-add guard by the supplied identifier (before any DB lookup):
-    # don't let a user friend themselves via their own email/invite code.
+    # Early self-add guards before any DB lookup.
     if email and user.get("email") and email.lower() == user["email"].lower():
         raise HTTPException(status_code=400, detail="Cannot friend yourself.")
+    if user_id_in and user_id_in == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot friend yourself.")
 
-    # Find the target user (invite_code takes precedence if both supplied).
+    # Find the target user. Precedence: invite_code > email > user_id (global ranks).
     if invite_code:
         target = db.table("profiles").select("id, invite_code").eq("invite_code", invite_code).execute()
-    else:
+    elif email:
         target = db.table("profiles").select("id, invite_code").eq("email", email).execute()
+    else:
+        uid = valid_uuid(user_id_in, not_found_detail="User not found.")
+        target = db.table("profiles").select("id, invite_code").eq("id", uid).execute()
 
     if not target.data:
         raise HTTPException(status_code=404, detail="User not found.")

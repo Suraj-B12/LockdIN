@@ -119,9 +119,10 @@ class FriendProfileResponse(BaseModel):
 # ========== FRIENDS ==========
 
 class FriendRequest(BaseModel):
-    """Send friend request by invite code or email."""
+    """Send friend request by invite code, email, or user id (global ranks)."""
     invite_code: Optional[str] = None
     email: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class FriendResponse(BaseModel):
@@ -179,6 +180,17 @@ class LeaderboardEntry(BaseModel):
 class LeaderboardResponse(BaseModel):
     period: str  # "daily", "weekly", "alltime"
     entries: list[LeaderboardEntry]
+    your_rank: Optional[int] = None
+
+
+class GlobalLeaderboardEntry(LeaderboardEntry):
+    # Relationship to the viewer: self | friends | pending_out | pending_in | blocked | none
+    friend_status: str = "none"
+
+
+class GlobalLeaderboardResponse(BaseModel):
+    period: str
+    entries: list[GlobalLeaderboardEntry]
     your_rank: Optional[int] = None
 
 
