@@ -185,6 +185,16 @@ class ReactionBatchRequest(BaseModel):
     session_ids: list[UUID] = Field(default_factory=list)
 
 
+class ReactionReceived(BaseModel):
+    # A reaction a friend left on one of the caller's own sessions.
+    actor_id: UUID
+    actor_name: str
+    actor_avatar: Optional[str] = None
+    emoji: str
+    session_id: UUID
+    created_at: datetime
+
+
 # ========== ROOMS (Lock In Together) ==========
 
 class RoomParticipantOut(BaseModel):
@@ -216,6 +226,25 @@ class RoomJoin(BaseModel):
 class RoomHeartbeat(BaseModel):
     focus_seconds: Optional[int] = Field(None, ge=0, le=86_400)
     focusing: Optional[bool] = None
+
+
+# ----- Ephemeral in-room chat (NOT persisted) -----
+
+class ChatSend(BaseModel):
+    text: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    user_id: UUID
+    display_name: str
+    text: str
+    ts: float
+
+
+class ChatPollResponse(BaseModel):
+    messages: list[ChatMessageOut] = Field(default_factory=list)
+    latest_id: int = 0
 
 
 # ========== LEADERBOARD ==========

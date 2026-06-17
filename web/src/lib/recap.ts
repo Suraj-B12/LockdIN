@@ -46,3 +46,36 @@ export function markRecapShownThisSession(): void {
 export function defaultSince(): string {
   return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 }
+
+/** Minimum time away before the recap auto-opens on return (12 hours). */
+export const RECAP_AWAY_MS = 12 * 60 * 60 * 1000;
+
+/** True once the user has been away at least RECAP_AWAY_MS since last catch-up.
+ *  Returns false when there's no baseline yet (a first visit establishes one). */
+export function awayLongEnough(userId: string): boolean {
+  const last = getRecapLastSeen(userId);
+  if (!last) return false;
+  const t = Date.parse(last);
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t >= RECAP_AWAY_MS;
+}
+
+/* ---- Reaction-celebration dedupe: remember the newest received reaction we've
+   already confetti'd, so the same one doesn't re-celebrate every recap. ---- */
+const reactionCelKey = (userId: string) => `lockdin:reactionCelebrated:${userId}`;
+
+export function getReactionCelebrated(userId: string): string | null {
+  try {
+    return localStorage.getItem(reactionCelKey(userId));
+  } catch {
+    return null;
+  }
+}
+
+export function setReactionCelebrated(userId: string, iso: string): void {
+  try {
+    localStorage.setItem(reactionCelKey(userId), iso);
+  } catch {
+    /* ignore */
+  }
+}

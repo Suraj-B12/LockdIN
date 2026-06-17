@@ -10,7 +10,14 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Card } from "@/components/ui";
 import { RecapInbox } from "@/components/RecapInbox";
 import { MilestoneModal } from "@/components/MilestoneModal";
-import { useProfile, useHistory, useBuddy, useFriendsActivity } from "@/lib/queries";
+import {
+  useProfile,
+  useHistory,
+  useBuddy,
+  useFriendsActivity,
+  useMyReactions,
+  useActiveSession,
+} from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import {
   getRecapLastSeen,
@@ -18,9 +25,13 @@ import {
   recapShownThisSession,
   markRecapShownThisSession,
   defaultSince,
+  awayLongEnough,
+  getReactionCelebrated,
+  setReactionCelebrated,
 } from "@/lib/recap";
+import { REACTION_GLYPH } from "@/lib/reactions";
 import { milestoneReached, getLastCelebrated, setLastCelebrated } from "@/lib/milestones";
-import { celebrate } from "@/lib/celebrate";
+import { celebrate, celebrateReactions } from "@/lib/celebrate";
 import { revealStagger, revealItem } from "@/lib/motion";
 // NOTE: import the subcomponents by their explicit file paths. The folder
 // `pages/dashboard/` and this file `pages/Dashboard.tsx` differ only in case,
@@ -57,7 +68,7 @@ export function Dashboard() {
 
   const sub = useMemo(() => subgreeting(), []);
 
-  // ---- "While you were gone" friend recap ----
+  // ---- "While you were gone" recap (friends' activity + reactions on you) ----
   const userId = user?.id;
   // Capture the look-back window ONCE (last catch-up, or 7d for a first visit)
   // so it stays stable across re-renders and the query key doesn't churn.
@@ -65,7 +76,23 @@ export function Dashboard() {
     () => (userId ? getRecapLastSeen(userId) : null) ?? defaultSince()
   );
   const { data: recap } = useFriendsActivity(recapSince, { enabled: !!userId });
+  const { data: received } = useMyReactions(recapSince, { enabled: !!userId });
   const [recapOpen, setRecapOpen] = useState(false);
+
+  // Never interrupt a focus session with the recap.
+  const { data: activeSession } = useActiveSession();
+  const sessionActive =
+    activeSession?.status === "active" || activeSession?.status === "paused";
+
+  // Re-evaluate the away-gate when the user returns to an already-open tab.
+  const [visTick, setVisTick] = useState(0);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") setVisTick((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
   // ---- Streak milestone celebration (takes precedence over the recap) ----
   const [milestone, setMilestone] = useState<number | null>(null);
@@ -90,19 +117,53 @@ export function Dashboard() {
   }, [userId, buddy, currentStreak]);
 
   useEffect(() => {
-    if (!userId || !recap || recapShownThisSession() || milestone != null) return;
-    const returning = !!getRecapLastSeen(userId);
-    // Auto-open when friends were productive, or (for returning users) when
-    // there are quiet friends worth nudging. Never nag first-time users with an
-    // all-idle list, and never open with zero friends.
-    const worthShowing = recap.active_count > 0 || (returning && recap.idle_count > 0);
-    if (worthShowing && recap.items.length > 0) {
-      setRecapOpen(true);
-      markRecapShownThisSession();
-      // Mark this as the catch-up point even if they navigate away without closing.
+    if (!userId) return;
+    // First visit: establish the away-baseline so the 12h clock can start, and
+    // don't pop the recap immediately for a brand-new user.
+    if (!getRecapLastSeen(userId)) {
       setRecapLastSeen(userId, new Date().toISOString());
+      return;
     }
-  }, [userId, recap, milestone]);
+    // Wait for the active-session state to actually resolve. `undefined` means the
+    // /sessions/active request is still in flight — treating that as "no session"
+    // would let the recap pop OVER a paused/active session if it resolves last.
+    if (activeSession === undefined) return;
+    // We can only open the modal once `recap` has loaded (the render + RecapInbox
+    // require it). Gating here also prevents firing the celebration / advancing the
+    // dedupe watermark before the inbox can actually show.
+    if (!recap) return;
+    // Gates: once per browser session, never over a milestone, never during a
+    // focus session, and only after a long-enough absence (12h).
+    if (recapShownThisSession() || milestone != null || sessionActive) return;
+    if (!awayLongEnough(userId)) return;
+
+    const hasReactions = !!received && received.length > 0;
+    const friendsWorth =
+      !!recap && recap.items.length > 0 && (recap.active_count > 0 || recap.idle_count > 0);
+    if (!hasReactions && !friendsWorth) return;
+
+    setRecapOpen(true);
+    markRecapShownThisSession();
+    // Mark this as the catch-up point even if they navigate away without closing.
+    setRecapLastSeen(userId, new Date().toISOString());
+
+    // Celebrate NEW reactions full-screen (emoji rain + distinct bell), deduped
+    // by the newest reaction we've already celebrated.
+    if (hasReactions && received) {
+      const lastCel = getReactionCelebrated(userId);
+      const fresh = received.filter((r) => !lastCel || r.created_at > lastCel);
+      if (fresh.length > 0) {
+        celebrateReactions(fresh.map((r) => REACTION_GLYPH[r.emoji]));
+        setReactionCelebrated(userId, received[0].created_at); // server orders desc
+      }
+    }
+  }, [userId, recap, received, milestone, activeSession, sessionActive, visTick]);
+
+  // Defense-in-depth: if a focus session is (or becomes) active while the recap
+  // is open, close it — the recap must never sit over a live session.
+  useEffect(() => {
+    if (sessionActive && recapOpen) setRecapOpen(false);
+  }, [sessionActive, recapOpen]);
 
   const closeRecap = () => {
     setRecapOpen(false);
@@ -193,9 +254,11 @@ export function Dashboard() {
         )}
       </AnimatePresence>
 
-      {/* "While you were gone" friend recap (auto-opens once per session) */}
+      {/* "While you were gone" recap — friends' activity + reactions on you */}
       <AnimatePresence>
-        {recapOpen && recap && <RecapInbox data={recap} onClose={closeRecap} />}
+        {recapOpen && recap && (
+          <RecapInbox data={recap} reactions={received ?? []} onClose={closeRecap} />
+        )}
       </AnimatePresence>
     </div>
   );

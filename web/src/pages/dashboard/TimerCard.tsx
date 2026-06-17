@@ -5,8 +5,8 @@
    Finish. Made to feel instant: optimistic state transitions, RAF-driven tick
    derived from wall-clock so it stays accurate across tab throttling.
    ===================================================================== */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { Play, Pause, Flag, ArrowClockwise, Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
@@ -22,10 +22,11 @@ import {
 } from "@/lib/queries";
 import type { SessionResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
-import { formatClock, formatDuration, scoreToneClass } from "./utils";
+import { formatClock, formatDuration } from "./utils";
 import { WorkLogSheet } from "./WorkLogSheet";
 import { CancelSessionDialog } from "./CancelSessionDialog";
-import { celebrate, playStartCue } from "@/lib/celebrate";
+import { SessionFinale } from "./SessionFinale";
+import { playStartCue } from "@/lib/celebrate";
 import { pickBuddyLine, playBuddyLine, type BuddyState } from "@/lib/buddySpeech";
 
 /** Seconds the ring loops over — a visual "sweep", not a hard goal (60 min). */
@@ -51,6 +52,15 @@ export function TimerCard() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // The choreographed end-of-session overlay (score count-up → streak → buddy → confetti).
+  const [finale, setFinale] = useState<{
+    score: number | null;
+    streak: number;
+    durationLabel: string;
+  } | null>(null);
+  // Stable identity so the finale's auto-dismiss/escape timers don't reset when
+  // an unrelated re-render (e.g. the buddy refetch) gives onClose a new closure.
+  const closeFinale = useCallback(() => setFinale(null), []);
 
   // The buddy reacts at the two emotional peaks — starting (anticipation) and
   // finishing (peak-end). Honors mute inside playBuddyLine.
@@ -199,23 +209,14 @@ export function TimerCard() {
       {
         onSuccess: (finished) => {
           setSheetOpen(false);
-          celebrate(); // confetti burst + success chime + haptic
-          buddySpeak(); // buddy reacts — the warm, ceremonial "end" (peak-end rule)
-          const score = finished.ai_score;
-          const cls = typeof score === "number" ? scoreToneClass(score) : "text-teal-bright";
-          toast.success(
-            typeof score === "number" ? (
-              <span>
-                Session scored <span className={`font-mono font-semibold ${cls}`}>{score}</span>
-                /100
-              </span>
-            ) : (
-              "Session logged"
-            ),
-            {
-              description: `${formatDuration(loggedSeconds)} of focus · your AI score will sharpen in a moment.`,
-            }
-          );
+          // Hand the moment to the choreographed finale: it counts the score up
+          // on an S-curve, ticks in the streak, lets the buddy react (peak-end),
+          // then fires confetti + haptic. Replaces the old flat celebrate+toast.
+          setFinale({
+            score: typeof finished.ai_score === "number" ? finished.ai_score : null,
+            streak: buddy?.current_streak ?? 0,
+            durationLabel: formatDuration(loggedSeconds),
+          });
         },
         onError: (err) => {
           if (err instanceof ApiError && err.status === 409) {
@@ -384,6 +385,18 @@ export function TimerCard() {
         }}
         onConfirm={handleCancelConfirm}
       />
+
+      <AnimatePresence>
+        {finale && (
+          <SessionFinale
+            score={finale.score}
+            streak={finale.streak}
+            durationLabel={finale.durationLabel}
+            onSpeak={buddySpeak}
+            onClose={closeFinale}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

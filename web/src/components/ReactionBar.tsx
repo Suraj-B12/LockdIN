@@ -5,16 +5,10 @@
    ===================================================================== */
 import { motion, useReducedMotion } from "framer-motion";
 import type { ReactionEmoji, ReactionState } from "@/lib/types";
+import { REACTIONS } from "@/lib/reactions";
 import { cn } from "@/lib/cn";
 
-const EMOJI: { key: ReactionEmoji; glyph: string; label: string }[] = [
-  { key: "fire", glyph: "🔥", label: "Fire" },
-  { key: "clap", glyph: "👏", label: "Respect" },
-  { key: "muscle", glyph: "💪", label: "Strong" },
-  { key: "brain", glyph: "🧠", label: "Big brain" },
-  { key: "eyes", glyph: "👀", label: "Watching" },
-  { key: "hundred", glyph: "💯", label: "100" },
-];
+const EMOJI = REACTIONS;
 
 export interface ReactionBarProps {
   state?: ReactionState;
@@ -25,13 +19,14 @@ export interface ReactionBarProps {
 export function ReactionBar({ state, onToggle, disabled }: ReactionBarProps) {
   const reduce = useReducedMotion();
   const counts = state?.counts ?? {};
-  const mine = state?.mine ?? [];
+  // Single-select: at most one of your reactions is active at a time.
+  const mine = state?.mine?.[0];
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {EMOJI.map((e) => {
         const count = counts[e.key] ?? 0;
-        const active = mine.includes(e.key);
+        const active = mine === e.key;
         return (
           <motion.button
             key={e.key}

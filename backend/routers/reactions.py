@@ -1,23 +1,46 @@
 """Reactions — give-only positive emoji on friends' finished sessions.
 
-A tap toggles one (actor, session, emoji) row idempotently. No downvotes, no
-read-receipts (validation, never anxiety). You may react to your own or an
-ACCEPTED friend's session. Delivery rides the existing batched recap — there is
-NO per-reaction push (avoids a notification treadmill).
+SINGLE-select: a user holds at most ONE reaction per session. Tapping a different
+emoji replaces it; tapping the active one removes it. No downvotes, no read-
+receipts (validation, never anxiety). You may react to your own or an ACCEPTED
+friend's session. The `received` endpoint surfaces reactions left on YOUR
+sessions (delivered via the recap — no per-reaction push / notification treadmill).
 
-Assumes migration_008 (reactions). Both endpoints fail safe (empty state) if the
-table doesn't exist yet, so the session feed renders normally pre-migration and a
-toggle never 500s during the deploy→migrate window.
+Assumes migration_008 (table) + migration_009 (single-select uniqueness). Every
+endpoint fails safe (empty result) if the table doesn't exist yet, so the rest of
+the app renders normally pre-migration and nothing 500s during the deploy→migrate
+window.
 """
+
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
 from services.cache import rate_limit_ok
 from routers.notifications import _get_friend_ids
-from models.schemas import ReactionToggle, ReactionState, ReactionBatchRequest
+from models.schemas import (
+    ReactionToggle,
+    ReactionState,
+    ReactionBatchRequest,
+    ReactionReceived,
+)
 
 router = APIRouter(prefix="/api/reactions", tags=["Reactions"])
+
+
+def _clamp_since(since: str | None) -> datetime:
+    """Parse a since= window: default 7 days, clamped to a 30-day floor."""
+    now = datetime.now(timezone.utc)
+    if not since:
+        return now - timedelta(days=7)
+    try:
+        dt = datetime.fromisoformat(str(since).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return now - timedelta(days=7)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return max(dt, now - timedelta(days=30))
 
 
 def _state_for(db, session_id: str, actor_id: str) -> dict:
@@ -78,11 +101,70 @@ async def batch_reactions(body: ReactionBatchRequest, user: dict = Depends(get_c
     return out
 
 
+@router.get("/received", response_model=list[ReactionReceived])
+async def reactions_received(since: str | None = None, user: dict = Depends(get_current_user)):
+    """Reactions friends left on the CALLER's own sessions since `since` (default
+    7d). Authorized by session ownership. Fails safe ([]) pre-migration."""
+    db = get_supabase()
+    since_dt = _clamp_since(since)
+
+    # The caller's session ids (a reaction references a session; we only surface
+    # reactions on sessions the caller OWNS). Bound to the 200 most-recent FINISHED
+    # sessions: reactions only land on finished sessions, the `since` window keeps
+    # them recent, and a larger IN(...) list would overflow the PostgREST URL
+    # (same 200 cap the batch endpoint uses).
+    try:
+        mine = db.table("sessions").select("id") \
+            .eq("user_id", user["id"]) \
+            .eq("status", "finished") \
+            .order("finished_at", desc=True) \
+            .limit(200) \
+            .execute()
+    except Exception:
+        return []
+    my_ids = [s["id"] for s in (mine.data or [])]
+    if not my_ids:
+        return []
+
+    try:
+        rows = db.table("reactions") \
+            .select("actor_id, emoji, target_session_id, created_at") \
+            .in_("target_session_id", my_ids) \
+            .neq("actor_id", user["id"]) \
+            .gte("created_at", since_dt.isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(50) \
+            .execute()
+    except Exception:
+        return []  # table not migrated yet
+    if not rows.data:
+        return []
+
+    actor_ids = list({r["actor_id"] for r in rows.data})
+    try:
+        profs = db.table("profiles").select("id, display_name, avatar_url").in_("id", actor_ids).execute()
+        pmap = {p["id"]: p for p in (profs.data or [])}
+    except Exception:
+        pmap = {}  # degrade to generic names rather than 500 (fallbacks below cover it)
+
+    return [
+        {
+            "actor_id": r["actor_id"],
+            "actor_name": pmap.get(r["actor_id"], {}).get("display_name", "A friend"),
+            "actor_avatar": pmap.get(r["actor_id"], {}).get("avatar_url"),
+            "emoji": r["emoji"],
+            "session_id": r["target_session_id"],
+            "created_at": r["created_at"],
+        }
+        for r in rows.data
+    ]
+
+
 @router.post("/{session_id}", response_model=ReactionState)
 async def toggle_reaction(
     session_id: str, body: ReactionToggle, user: dict = Depends(get_current_user)
 ):
-    """Toggle one emoji on a session (yours or an accepted friend's)."""
+    """Set/replace/clear your single reaction on a session (yours or a friend's)."""
     sid = valid_uuid(session_id, not_found_detail="Session not found.")
     db = get_supabase()
 
@@ -105,25 +187,29 @@ async def toggle_reaction(
         if not friendship.data:
             raise HTTPException(status_code=403, detail="You can only react to friends' sessions.")
 
-    # Find the caller's existing reaction (fails safe if the table isn't migrated
-    # yet — same graceful degradation as the batch endpoint).
+    # Find the caller's existing reaction on this session (single-select → at most
+    # one). Fails safe if the table isn't migrated yet, like the batch endpoint.
     try:
         existing = db.table("reactions") \
-            .select("id") \
+            .select("id, emoji") \
             .eq("actor_id", user["id"]) \
             .eq("target_session_id", sid) \
-            .eq("emoji", body.emoji) \
             .execute()
     except Exception:
         return {"counts": {}, "mine": []}  # table not migrated yet
 
-    if existing.data:
-        # Un-react ALWAYS proceeds — undo is never spammy, so we don't rate-limit
-        # it. (Rate-limiting the delete made a quick tap→untap silently stick.)
-        db.table("reactions").delete().eq("id", existing.data[0]["id"]).execute()
+    current = existing.data[0] if existing.data else None
+
+    if current and current["emoji"] == body.emoji:
+        # Tapped your active emoji → un-react. Always proceeds (undo is never spammy).
+        db.table("reactions").delete().eq("id", current["id"]).execute()
+    elif current:
+        # Tapped a different emoji → REPLACE in place. Atomic update of the one
+        # row, so you're never momentarily left with zero, and never rate-limited.
+        db.table("reactions").update({"emoji": body.emoji}).eq("id", current["id"]).execute()
     else:
-        # Light anti-spam on the only direction that can spam: re-adding.
-        if not await rate_limit_ok(f"react:{user['id']}:{sid}:{body.emoji}", 1):
+        # First reaction on this session — light anti-spam on the add only.
+        if not await rate_limit_ok(f"react:{user['id']}:{sid}", 1):
             return _state_for(db, sid, user["id"])
         try:
             db.table("reactions").insert({
@@ -132,6 +218,6 @@ async def toggle_reaction(
                 "emoji": body.emoji,
             }).execute()
         except Exception:
-            pass  # concurrent identical insert lost the UNIQUE race — idempotent
+            pass  # lost the UNIQUE(actor,session) race — idempotent
 
     return _state_for(db, sid, user["id"])

@@ -31,9 +31,12 @@ import type {
   RoomResponse,
   RoomJoinBody,
   RoomHeartbeatBody,
+  ChatMessage,
+  ChatPollResponse,
   ReactionState,
   ReactionMap,
   ReactionEmoji,
+  ReactionReceived,
 } from "./types";
 
 /* ---- Query keys (stable, centralized) ---- */
@@ -54,6 +57,7 @@ export const qk = {
   authMe: ["auth", "me"] as const,
   activeRoom: ["rooms", "active"] as const,
   room: (id: string) => ["rooms", id] as const,
+  roomChat: (id: string) => ["rooms", id, "chat"] as const,
 };
 
 /* =====================================================================
@@ -424,6 +428,26 @@ export function useRoomHeartbeat() {
   });
 }
 
+/** GET /rooms/{id}/chat → ephemeral messages (in-memory, not stored). Polls ~5s. */
+export function useRoomChat(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.roomChat(id ?? ""),
+    queryFn: ({ signal }) => api.get<ChatPollResponse>(`/rooms/${id}/chat`, { signal }),
+    enabled: !!id && enabled,
+    refetchInterval: 5_000,
+  });
+}
+
+/** POST /rooms/{id}/chat {text} → send an ephemeral chat message. */
+export function useSendRoomChat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) =>
+      api.post<ChatMessage>(`/rooms/${id}/chat`, { text }),
+    onSuccess: (_msg, { id }) => qc.invalidateQueries({ queryKey: qk.roomChat(id) }),
+  });
+}
+
 /* =====================================================================
    Reactions
    ===================================================================== */
@@ -450,16 +474,25 @@ export function useToggleReaction() {
       await qc.cancelQueries({ queryKey: ["reactions", "batch"] });
       // Snapshot every batch map so onError can revert instantly on 403/404/etc.
       const prev = qc.getQueriesData<ReactionMap>({ queryKey: ["reactions", "batch"] });
-      // Optimistically toggle for instant give-only feedback. `old ?? {}` lets the
-      // very first tap render even before the batch fetch has landed.
+      // Optimistically apply SINGLE-select: tapping the active emoji clears it,
+      // tapping a different one replaces the prior. `old ?? {}` lets the very
+      // first tap render even before the batch fetch has landed.
       qc.setQueriesData<ReactionMap>({ queryKey: ["reactions", "batch"] }, (old) => {
         const base = old ?? {};
         const st = base[sessionId] ?? { counts: {}, mine: [] };
-        const has = st.mine.includes(emoji);
+        const prev = st.mine[0]; // single-select → 0 or 1
         const counts = { ...st.counts };
-        counts[emoji] = (counts[emoji] ?? 0) + (has ? -1 : 1);
-        if ((counts[emoji] ?? 0) <= 0) delete counts[emoji];
-        const mine = has ? st.mine.filter((e) => e !== emoji) : [...st.mine, emoji];
+        if (prev) {
+          counts[prev] = (counts[prev] ?? 0) - 1;
+          if ((counts[prev] ?? 0) <= 0) delete counts[prev];
+        }
+        let mine: ReactionEmoji[];
+        if (prev === emoji) {
+          mine = []; // tapped the active one → cleared
+        } else {
+          counts[emoji] = (counts[emoji] ?? 0) + 1;
+          mine = [emoji]; // new or replaced reaction
+        }
         return { ...base, [sessionId]: { counts, mine } };
       });
       return { prev };
@@ -468,5 +501,26 @@ export function useToggleReaction() {
       ctx?.prev?.forEach(([k, data]) => qc.setQueryData(k, data));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["reactions", "batch"] }),
+  });
+}
+
+/**
+ * GET /reactions/received?since=ISO → reactions friends left on MY sessions.
+ * Powers the "a friend reacted to your session" recap. Fails safe ([]) if the
+ * table isn't migrated. `since` is part of the key so a new window refetches.
+ */
+export function useMyReactions(
+  since: string,
+  options?: Partial<UseQueryOptions<ReactionReceived[]>>
+) {
+  return useQuery({
+    queryKey: ["reactions", "received", since],
+    queryFn: ({ signal }) =>
+      api.get<ReactionReceived[]>(
+        `/reactions/received?since=${encodeURIComponent(since)}`,
+        { signal }
+      ),
+    staleTime: 60_000,
+    ...options,
   });
 }

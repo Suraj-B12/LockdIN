@@ -23,7 +23,12 @@ import {
 import { Avatar } from "@/components/ui";
 import { useNudgeFriend } from "@/lib/queries";
 import { moodEmoji } from "@/lib/buddy";
-import type { FriendActivityItem, FriendActivityResponse } from "@/lib/types";
+import { REACTION_GLYPH } from "@/lib/reactions";
+import type {
+  FriendActivityItem,
+  FriendActivityResponse,
+  ReactionReceived,
+} from "@/lib/types";
 
 function fmtDuration(seconds: number): string {
   const m = Math.round(seconds / 60);
@@ -48,10 +53,12 @@ function fmtAgo(iso: string | null): string {
 
 export interface RecapInboxProps {
   data: FriendActivityResponse;
+  /** Reactions friends left on YOUR sessions while away (give-only positivity). */
+  reactions?: ReactionReceived[];
   onClose: () => void;
 }
 
-export function RecapInbox({ data, onClose }: RecapInboxProps) {
+export function RecapInbox({ data, reactions = [], onClose }: RecapInboxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape.
@@ -95,11 +102,16 @@ export function RecapInbox({ data, onClose }: RecapInboxProps) {
   const active = data.items.filter((i) => i.active);
   const idle = data.items.filter((i) => !i.active);
   const totalSeconds = active.reduce((acc, i) => acc + (i.total_seconds || 0), 0);
+  const hasReactions = reactions.length > 0;
 
   const headline =
     data.active_count > 0
       ? `${data.active_count} ${data.active_count === 1 ? "friend" : "friends"} locked in while you were away`
-      : "Your circle's been quiet";
+      : hasReactions
+        ? reactions.length === 1
+          ? "Someone cheered your work on"
+          : `${reactions.length} cheers on your sessions`
+        : "Your circle's been quiet";
 
   return (
     <motion.div
@@ -159,6 +171,23 @@ export function RecapInbox({ data, onClose }: RecapInboxProps) {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
+          {/* Reactions friends left on YOUR sessions — pure encouragement, up top. */}
+          {hasReactions && (
+            <>
+              <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-eyebrow text-teal-bright">
+                Cheers on your sessions
+              </p>
+              <ul className="flex flex-col gap-2">
+                {reactions.map((r, i) => (
+                  <ReactionRow key={`${r.session_id}-${r.actor_id}-${i}`} item={r} />
+                ))}
+              </ul>
+              {(active.length > 0 || idle.length > 0) && (
+                <div className="mx-3 my-3 border-t border-hairline/[0.06]" />
+              )}
+            </>
+          )}
+
           {active.length > 0 && (
             <ul className="flex flex-col gap-2">
               {active.map((f) => (
@@ -180,7 +209,7 @@ export function RecapInbox({ data, onClose }: RecapInboxProps) {
             </>
           )}
 
-          {data.items.length === 0 && (
+          {data.items.length === 0 && !hasReactions && (
             <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
               <span className="grid h-12 w-12 place-items-center rounded-2xl bg-surface-3/70 text-ink-muted">
                 <MoonStars weight="duotone" className="h-6 w-6" />
@@ -218,6 +247,42 @@ function NameLink({ item }: { item: FriendActivityItem }) {
     >
       {item.friend_name || "A friend"}
     </Link>
+  );
+}
+
+function ReactionRow({ item }: { item: ReactionReceived }) {
+  return (
+    <li className="flex items-center gap-3 rounded-2xl bg-teal/[0.06] px-3 py-2.5 ring-1 ring-inset ring-teal/12">
+      <div className="relative shrink-0">
+        <Avatar
+          src={item.actor_avatar}
+          alt={item.actor_name}
+          fallback={item.actor_name ?? "?"}
+          size="md"
+        />
+        <span
+          aria-hidden
+          className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-surface-2 text-xs leading-none ring-1 ring-inset ring-hairline/15"
+        >
+          {REACTION_GLYPH[item.emoji]}
+        </span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-ink">
+          <Link
+            to={`/u/${item.actor_id}`}
+            className="font-medium transition-colors hover:text-teal-bright"
+          >
+            {item.actor_name || "A friend"}
+          </Link>{" "}
+          reacted <span aria-hidden>{REACTION_GLYPH[item.emoji]}</span> to your session
+        </p>
+        <p className="mt-0.5 text-xs text-teal-bright">Keep going — your work is noticed.</p>
+      </div>
+      <span className="shrink-0 self-start font-mono text-[10px] tabular text-ink-faint">
+        {fmtAgo(item.created_at)}
+      </span>
+    </li>
   );
 }
 

@@ -191,11 +191,22 @@ export type ReactionEmoji = "fire" | "clap" | "muscle" | "eyes" | "brain" | "hun
 
 export interface ReactionState {
   counts: Partial<Record<ReactionEmoji, number>>;
+  /** The caller's reactions. Single-select → holds at most one entry. */
   mine: ReactionEmoji[];
 }
 
 /** session_id → its reaction state. */
 export type ReactionMap = Record<string, ReactionState>;
+
+/** A reaction a friend left on one of YOUR sessions (recap surface). */
+export interface ReactionReceived {
+  actor_id: string;
+  actor_name: string;
+  actor_avatar: string | null;
+  emoji: ReactionEmoji;
+  session_id: string;
+  created_at: string;
+}
 
 /* ---- Rooms (Lock In Together) ---- */
 export interface RoomParticipant {
@@ -227,6 +238,24 @@ export interface RoomJoinBody {
 export interface RoomHeartbeatBody {
   focus_seconds?: number;
   focusing?: boolean;
+}
+
+/* ---- Ephemeral in-room chat (not persisted) ---- */
+export interface ChatMessage {
+  id: number;
+  user_id: string;
+  display_name: string;
+  text: string;
+  ts: number;
+}
+
+export interface ChatPollResponse {
+  messages: ChatMessage[];
+  latest_id: number;
+}
+
+export interface SendChatBody {
+  text: string;
 }
 
 /* ---- Auth ---- */

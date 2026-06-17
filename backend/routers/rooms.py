@@ -17,9 +17,24 @@ from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
 from services.cache import rate_limit_ok
-from models.schemas import RoomResponse, RoomJoin, RoomHeartbeat
+from services import room_chat
+from models.schemas import (
+    RoomResponse,
+    RoomJoin,
+    RoomHeartbeat,
+    ChatSend,
+    ChatMessageOut,
+    ChatPollResponse,
+)
 
 router = APIRouter(prefix="/api/rooms", tags=["Rooms"])
+
+
+def _reject_if_closed(room: dict) -> None:
+    """A closed room is over for everyone — surface 409 so the client exits
+    cleanly instead of heart-beating (and inflating the tally) into a dead room."""
+    if room.get("status") == "closed":
+        raise HTTPException(status_code=409, detail="This room has closed.")
 
 # Presence: a participant is "live" if their last heartbeat was within this window.
 _LIVE_WINDOW_SECONDS = 45
@@ -205,7 +220,8 @@ async def join_room(body: RoomJoin, user: dict = Depends(get_current_user)):
 async def heartbeat(room_id: str, body: RoomHeartbeat, user: dict = Depends(get_current_user)):
     """Keep the requester 'live' and report focus progress (polled by the client)."""
     db = get_supabase()
-    _, participant, rid = _require_participant(db, room_id, user["id"])
+    room, participant, rid = _require_participant(db, room_id, user["id"])
+    _reject_if_closed(room)
 
     update = {"last_seen": _now().isoformat()}
     if body.focus_seconds is not None:
@@ -229,7 +245,41 @@ async def get_room(room_id: str, user: dict = Depends(get_current_user)):
     """Poll a room: its participants, live presence, and combined focus."""
     db = get_supabase()
     room, _, _ = _require_participant(db, room_id, user["id"])
+    _reject_if_closed(room)  # 409 → client drops back to the lobby
     return _build_room(db, room, user["id"])
+
+
+@router.post("/{room_id}/chat", response_model=ChatMessageOut)
+async def post_chat(room_id: str, body: ChatSend, user: dict = Depends(get_current_user)):
+    """Post an ephemeral chat message to the room (in-memory only, not stored)."""
+    db = get_supabase()
+    room, _, rid = _require_participant(db, room_id, user["id"])
+    _reject_if_closed(room)
+
+    # Validate BEFORE consuming the cooldown, so a whitespace-only/empty send (or
+    # its retry) doesn't burn the 1s window and block the next real message.
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message can't be empty.")
+
+    if not await rate_limit_ok(f"room:chat:{user['id']}", 1):
+        raise HTTPException(status_code=429, detail="You're sending messages too fast.")
+
+    # Resolve the display name from the profile so chat matches the presence grid.
+    prof = db.table("profiles").select("display_name").eq("id", user["id"]).execute()
+    name = (prof.data[0]["display_name"] if prof.data else None) or user.get("name") or "Someone"
+
+    return room_chat.post(rid, user["id"], name, text[:500])
+
+
+@router.get("/{room_id}/chat", response_model=ChatPollResponse)
+async def get_chat(room_id: str, after: int = 0, user: dict = Depends(get_current_user)):
+    """Poll ephemeral chat: messages with id > after, plus the latest id."""
+    db = get_supabase()
+    room, _, rid = _require_participant(db, room_id, user["id"])
+    _reject_if_closed(room)
+    messages, latest = room_chat.since(rid, after)
+    return {"messages": messages, "latest_id": latest}
 
 
 @router.post("/{room_id}/leave")

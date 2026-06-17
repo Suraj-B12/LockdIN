@@ -19,6 +19,8 @@ import {
   Flag,
   Circle,
   ArrowClockwise,
+  ChatCircle,
+  PaperPlaneTilt,
 } from "@phosphor-icons/react";
 import { Avatar, Button, Card, EyebrowTag, Input, Reveal, Skeleton } from "@/components/ui";
 import { ApiError } from "@/lib/api";
@@ -29,16 +31,19 @@ import {
   useJoinRoom,
   useLeaveRoom,
   useRoomHeartbeat,
+  useRoomChat,
+  useSendRoomChat,
   useActiveSession,
   useStartSession,
   useResumeSession,
   useFinishSession,
   qk,
 } from "@/lib/queries";
-import type { RoomResponse, SessionResponse } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
+import type { RoomResponse, SessionResponse, ChatMessage } from "@/lib/types";
 import { formatClock, formatDuration, scoreToneClass } from "./dashboard/utils";
 import { WorkLogSheet } from "./dashboard/WorkLogSheet";
-import { celebrate } from "@/lib/celebrate";
+import { celebrate, pingMessage } from "@/lib/celebrate";
 
 /** Live elapsed seconds for an active session (banked + current segment). */
 function liveElapsed(s: SessionResponse): number {
@@ -159,8 +164,48 @@ function Lobby() {
 /* ---- In-room view: presence + your focus ---- */
 function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const myId = user?.id;
   const { data: room, isError } = useRoom(roomId, true);
   const r = room ?? initial;
+
+  // Ephemeral chat: poll, render, and alert (toast + ping) on others' messages.
+  const { data: chat } = useRoomChat(roomId, true);
+  const messages = chat?.messages ?? [];
+  const lastSeenIdRef = useRef(0);
+  const primedRef = useRef(false);
+  useEffect(() => {
+    if (!chat) return;
+    const latest = chat.latest_id ?? 0;
+    // First poll on entry: prime the cursor without alerting on the backlog.
+    if (!primedRef.current) {
+      primedRef.current = true;
+      lastSeenIdRef.current = latest;
+      return;
+    }
+    // Cold-start / buffer-wiped (server restarted) — latest rewound; just resync.
+    if (latest <= lastSeenIdRef.current) {
+      lastSeenIdRef.current = latest;
+      return;
+    }
+    const fresh = (chat.messages ?? []).filter(
+      (m) => m.id > lastSeenIdRef.current && m.user_id !== myId
+    );
+    // Advance past everything the server has — if >50 messages arrived in one
+    // window the oldest are already evicted from the 50-cap ring buffer, so
+    // there's nothing to recover (chat is ephemeral). Worst case: a rare missed
+    // toast for a since-evicted message.
+    lastSeenIdRef.current = latest;
+    if (fresh.length > 0) {
+      const last = fresh[fresh.length - 1];
+      // Title the toast by author only when a single message is new; coalesce
+      // multiple into a count so we don't mis-attribute several to one person.
+      const title = fresh.length > 1 ? `${fresh.length} new messages` : last.display_name;
+      toast.message(title, { description: last.text });
+      pingMessage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat?.latest_id]);
 
   const { data: session } = useActiveSession();
   const start = useStartSession();
@@ -405,6 +450,9 @@ function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }
         </ul>
       </Card>
 
+      {/* Live chat — ephemeral company for this session (not saved). */}
+      <ChatPanel roomId={roomId} messages={messages} myId={myId} />
+
       <WorkLogSheet
         open={sheetOpen}
         elapsedSeconds={frozen}
@@ -415,6 +463,112 @@ function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }
         onSubmit={onFinishSubmit}
       />
     </Reveal>
+  );
+}
+
+/* ---- Live chat panel: ephemeral, in-memory, not stored ---- */
+function ChatPanel({
+  roomId,
+  messages,
+  myId,
+}: {
+  roomId: string;
+  messages: ChatMessage[];
+  myId?: string;
+}) {
+  const send = useSendRoomChat();
+  const [text, setText] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Keep the view pinned to the newest message.
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const t = text.trim();
+    if (!t || send.isPending) return;
+    send.mutate(
+      { id: roomId, text: t.slice(0, 500) },
+      {
+        onSuccess: () => setText(""),
+        onError: (err) =>
+          toast.error(
+            err instanceof ApiError && err.status === 429
+              ? "Slow down a moment."
+              : err instanceof Error
+                ? err.message
+                : "Couldn't send."
+          ),
+      }
+    );
+  };
+
+  return (
+    <Card bodyClassName="p-0">
+      <div className="flex items-center gap-2 border-b border-hairline/[0.07] px-5 py-3.5">
+        <ChatCircle weight="duotone" className="h-5 w-5 text-teal-bright" />
+        <h2 className="font-display text-base tracking-tight text-ink">Room chat</h2>
+        <span className="ml-auto text-[11px] text-ink-faint">Just for now — not saved</span>
+      </div>
+
+      <div
+        ref={listRef}
+        className="flex max-h-72 min-h-[7rem] flex-col gap-2.5 overflow-y-auto px-4 py-4"
+      >
+        {messages.length === 0 ? (
+          <p className="m-auto max-w-[18rem] text-center text-xs leading-relaxed text-ink-faint">
+            Say hi 👋 — cheer each other on while you focus. Messages disappear when the room
+            closes.
+          </p>
+        ) : (
+          messages.map((m) => {
+            const mine = m.user_id === myId;
+            return (
+              <div key={m.id} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                {!mine && (
+                  <span className="mb-0.5 px-1 text-[11px] font-medium text-ink-faint">
+                    {m.display_name}
+                  </span>
+                )}
+                <span
+                  className={
+                    "max-w-[80%] text-pretty break-words rounded-2xl px-3 py-2 text-sm leading-snug ring-1 ring-inset " +
+                    (mine
+                      ? "bg-teal/15 text-ink ring-teal/20"
+                      : "bg-surface-3/40 text-ink-soft ring-hairline/[0.07]")
+                  }
+                >
+                  {m.text}
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <form onSubmit={onSubmit} className="flex gap-2 border-t border-hairline/[0.07] p-3">
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, 500))}
+          placeholder="Say something…"
+          aria-label="Chat message"
+          autoComplete="off"
+          maxLength={500}
+          wrapperClassName="flex-1"
+        />
+        <Button
+          type="submit"
+          variant="primary"
+          leadingIcon={PaperPlaneTilt}
+          disabled={!text.trim() || send.isPending}
+        >
+          Send
+        </Button>
+      </form>
+    </Card>
   );
 }
 
