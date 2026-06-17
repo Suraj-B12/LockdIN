@@ -93,7 +93,7 @@ export function BuddyCard() {
               {line && (
                 <BuddySpeechBubble
                   key="buddy-bubble"
-                  className="absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2"
+                  className="absolute bottom-full left-1/2 z-30 mb-2"
                   text={line}
                   nonce={nonce}
                   muted={muted}

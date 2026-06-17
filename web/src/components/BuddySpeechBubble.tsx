@@ -67,13 +67,19 @@ export function BuddySpeechBubble({
   const typing = shown.length < text.length;
   const canSpeak = speechSupported();
 
+  // When centered (dashboard), do the horizontal -50% INSIDE framer-motion's
+  // transform. A Tailwind `-translate-x-1/2` class would be overridden by the
+  // inline transform framer writes for the y/scale spring, so the bubble would
+  // spill off to the right. Keeping x here makes centering robust.
+  const x = tailAlign === "center" ? "-50%" : 0;
+
   return (
     <motion.div
       role="status"
       aria-live="polite"
-      initial={{ opacity: 0, y: 8, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 6, scale: 0.96 }}
+      initial={{ opacity: 0, y: 8, scale: 0.94, x }}
+      animate={{ opacity: 1, y: 0, scale: 1, x }}
+      exit={{ opacity: 0, y: 6, scale: 0.96, x }}
       transition={{ type: "spring", stiffness: 460, damping: 30 }}
       className={cn(
         // Explicit width (not max-w) — an absolutely-positioned bubble would
