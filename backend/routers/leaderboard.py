@@ -39,8 +39,13 @@ async def get_global_leaderboard(period: str, user: dict = Depends(get_current_u
 
     db = get_supabase()
 
-    # Aggregate scores across everyone for the period (explicit row cap).
-    rows = _period_query(db, period, today, None).range(0, 4999).execute()
+    # Aggregate scores across everyone for the period. Order before the cap so
+    # truncation (if the table ever exceeds the cap) is deterministic/stable —
+    # newest days first.
+    rows = _period_query(db, period, today, None) \
+        .order("streak_date", desc=True) \
+        .range(0, 4999) \
+        .execute()
     totals: dict[str, dict] = {}
     for r in rows.data or []:
         t = totals.setdefault(r["user_id"], {"total_score": 0, "total_seconds": 0})
@@ -61,8 +66,12 @@ async def get_global_leaderboard(period: str, user: dict = Depends(get_current_u
         profs = db.table("profiles").select("id, display_name, avatar_url").in_("id", top_ids).execute()
         profile_map = {p["id"]: p for p in (profs.data or [])}
 
-    # The viewer's relationship to each shown user (any-status friendships).
+    # The viewer's relationship to each shown user (any-status friendships). Two
+    # directional rows can exist for a pair, so resolve by PRECEDENCE (a blocked
+    # relationship must always win) rather than last-write — otherwise a stale
+    # row could mask a block and offer an "Add" that then 409s.
     status_map: dict[str, str] = {}
+    precedence = {"blocked": 4, "friends": 3, "pending_in": 2, "pending_out": 1, "none": 0}
     fr = db.table("friendships") \
         .select("user_id, friend_id, status") \
         .or_(f"user_id.eq.{user['id']},friend_id.eq.{user['id']}") \
@@ -71,11 +80,15 @@ async def get_global_leaderboard(period: str, user: dict = Depends(get_current_u
         other = row["friend_id"] if row["user_id"] == user["id"] else row["user_id"]
         st = row["status"]
         if st == "accepted":
-            status_map[other] = "friends"
+            cand = "friends"
         elif st == "blocked":
-            status_map[other] = "blocked"
+            cand = "blocked"
         elif st == "pending":
-            status_map[other] = "pending_out" if row["user_id"] == user["id"] else "pending_in"
+            cand = "pending_out" if row["user_id"] == user["id"] else "pending_in"
+        else:
+            continue
+        if precedence[cand] > precedence.get(status_map.get(other, "none"), 0):
+            status_map[other] = cand
 
     entries = []
     for i, (uid, sc) in enumerate(top):

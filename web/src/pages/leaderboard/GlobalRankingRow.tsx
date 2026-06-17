@@ -24,6 +24,35 @@ export function GlobalRankingRow({ entry, isYou }: { entry: GlobalLeaderboardEnt
   const rank = entry.rank;
   const podium = rank === 1 || rank === 2 || rank === 3 ? PODIUM[rank] : null;
   const CoinIcon = podium?.icon;
+  // Only friends' (and your own) profiles are viewable — others 404 by design,
+  // so don't make them clickable dead-ends.
+  const linkable = isYou || entry.friend_status === "friends";
+
+  const identity = (
+    <>
+      <Avatar src={entry.avatar_url} alt={entry.display_name} fallback={entry.display_name} size="sm" glow={rank === 1} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "truncate text-sm font-medium text-ink",
+              linkable && "transition-colors group-hover:text-teal-bright"
+            )}
+          >
+            {entry.display_name}
+          </span>
+          {isYou && (
+            <span className="shrink-0 rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-medium text-teal-bright ring-1 ring-inset ring-teal/25">
+              You
+            </span>
+          )}
+        </div>
+        <div className="font-mono text-[11px] text-ink-faint tabular">
+          {formatScore(entry.total_score)} pts · {formatFocus(entry.total_seconds)}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div
@@ -42,28 +71,17 @@ export function GlobalRankingRow({ entry, isYou }: { entry: GlobalLeaderboardEnt
         {CoinIcon ? <CoinIcon weight="fill" className="h-4 w-4" /> : rank}
       </span>
 
-      {/* Identity → profile (friend-gated; non-friends 404 gracefully) */}
-      <Link
-        to={`/u/${entry.user_id}`}
-        className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-bright/60"
-      >
-        <Avatar src={entry.avatar_url} alt={entry.display_name} fallback={entry.display_name} size="sm" glow={rank === 1} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-ink transition-colors group-hover:text-teal-bright">
-              {entry.display_name}
-            </span>
-            {isYou && (
-              <span className="shrink-0 rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-medium text-teal-bright ring-1 ring-inset ring-teal/25">
-                You
-              </span>
-            )}
-          </div>
-          <div className="font-mono text-[11px] text-ink-faint tabular">
-            {formatScore(entry.total_score)} pts · {formatFocus(entry.total_seconds)}
-          </div>
-        </div>
-      </Link>
+      {/* Identity → profile only when viewable (friends / self). */}
+      {linkable ? (
+        <Link
+          to={isYou ? "/profile" : `/u/${entry.user_id}`}
+          className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-bright/60"
+        >
+          {identity}
+        </Link>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-3">{identity}</div>
+      )}
 
       {/* Relationship action */}
       {!isYou && <ActionSlot userId={entry.user_id} name={entry.display_name} status={entry.friend_status} />}

@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth import get_current_user, valid_uuid
 from services.supabase_client import get_supabase
-from services.cache import rate_limit_ok
+from services.cache import rate_limit_ok, cache_delete
 from models.schemas import (
     FriendRequest,
     FriendResponse,
@@ -318,6 +318,11 @@ async def send_friend_request(body: FriendRequest, user: dict = Depends(get_curr
         notify_friend_request(friend_id, user.get("name", "Someone"))
     )
 
+    # The global board shows per-viewer friend_status — bust its cache so the
+    # new "pending" state shows immediately (cache is per-user, not reachable
+    # from the client's TanStack invalidation).
+    await cache_delete("lbglobal:*")
+
     return result.data[0]
 
 
@@ -346,6 +351,7 @@ async def respond_to_request(
         # Delete the friendship entirely. Echo the row back with a "rejected"
         # status so the client sees the resolved state (the row no longer exists).
         db.table("friendships").delete().eq("id", friendship_id).execute()
+        await cache_delete("lbglobal:*")
         rejected = dict(friendship.data[0])
         rejected["status"] = "rejected"
         return rejected
@@ -363,6 +369,7 @@ async def respond_to_request(
         # Lost a race (row deleted/changed between check and update).
         raise HTTPException(status_code=404, detail="Pending request not found.")
 
+    await cache_delete("lbglobal:*")
     return result.data[0]
 
 
@@ -381,4 +388,5 @@ async def remove_friend(friendship_id: str, user: dict = Depends(get_current_use
     if not result.data:
         raise HTTPException(status_code=404, detail="Friendship not found.")
 
+    await cache_delete("lbglobal:*")
     return {"message": "Friend removed."}

@@ -167,7 +167,9 @@ function GlobalBoard({
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
       {yourRank != null && (
         <Reveal>
-          <YourRankCard rank={yourRank} period={period} entry={yourEntry} total={entries.length} />
+          {/* total=0 → YourRankCard omits the "of N" line: your global rank can
+              exceed the shown top-50, so a denominator would read wrong. */}
+          <YourRankCard rank={yourRank} period={period} entry={yourEntry} total={0} />
         </Reveal>
       )}
       <Reveal>

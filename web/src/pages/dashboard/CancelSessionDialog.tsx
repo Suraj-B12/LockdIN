@@ -4,7 +4,7 @@
    "are you sure" then a final destructive confirm. Matches the WorkLogSheet
    aesthetic (double-bezel glass sheet, scrim, spring), Esc / backdrop dismiss.
    ===================================================================== */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Trash, Warning, ArrowLeft } from "@phosphor-icons/react";
@@ -30,21 +30,33 @@ export function CancelSessionDialog({
   const reduce = useReducedMotion();
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Reset to the first step each time it opens; lock scroll + wire Esc.
+  // Reset to step 1 ONLY when the dialog opens — not on every parent re-render.
+  // (The timer re-renders ~1Hz; a deps-on-onClose effect here would otherwise
+  // snap the user back to step 1 each second and make discard unreachable.)
+  useEffect(() => {
+    if (open) setStep(1);
+  }, [open]);
+
+  // Latest props via refs so the scroll-lock/Esc effect can depend only on
+  // `open` and survive the per-second re-renders without tearing down.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const discardingRef = useRef(discarding);
+  discardingRef.current = discarding;
+
   useEffect(() => {
     if (!open) return;
-    setStep(1);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !discarding) onClose();
+      if (e.key === "Escape" && !discardingRef.current) onCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
-  }, [open, discarding, onClose]);
+  }, [open]);
 
   const first = step === 1;
   const title = first ? "Discard this session?" : "Are you sure?";

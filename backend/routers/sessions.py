@@ -183,8 +183,9 @@ async def finish_session(
     # Update streaks and buddy mood with the provisional score immediately.
     update_streak_and_buddy(user["id"], total, provisional["score"])
 
-    # Invalidate caches so the new score shows up.
+    # Invalidate caches so the new score shows up (friends + global boards).
     await cache_delete("lb:*")
+    await cache_delete("lbglobal:*")
     await cache_delete(f"streak:{user['id']}")
 
     # Notify friends of completion (fire-and-forget).
