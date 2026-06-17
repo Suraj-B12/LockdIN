@@ -203,11 +203,13 @@ export interface BuddyStyle {
 }
 
 export const BUDDY_STYLES: BuddyStyle[] = [
-  { id: "warm", label: "Warm", rate: 1.0, pitch: 1.1, hint: "Friendly and steady" },
-  { id: "cheerful", label: "Cheerful", rate: 1.08, pitch: 1.34, hint: "Bright and upbeat" },
-  { id: "calm", label: "Calm", rate: 0.9, pitch: 1.0, hint: "Soft and soothing" },
-  { id: "energetic", label: "Energetic", rate: 1.22, pitch: 1.28, hint: "Fast and hyped" },
-  { id: "deep", label: "Deep", rate: 0.95, pitch: 0.78, hint: "Low and grounded" },
+  // Pitches kept close to natural (1.0) — high pitch on synthetic voices reads
+  // as "chipmunk". Style is conveyed more by rate than by extreme pitch.
+  { id: "warm", label: "Warm", rate: 1.0, pitch: 1.03, hint: "Friendly and steady" },
+  { id: "cheerful", label: "Cheerful", rate: 1.07, pitch: 1.15, hint: "Bright and upbeat" },
+  { id: "calm", label: "Calm", rate: 0.9, pitch: 0.98, hint: "Soft and soothing" },
+  { id: "energetic", label: "Energetic", rate: 1.2, pitch: 1.12, hint: "Fast and hyped" },
+  { id: "deep", label: "Deep", rate: 0.95, pitch: 0.82, hint: "Low and grounded" },
 ];
 const DEFAULT_STYLE = "warm";
 
@@ -269,29 +271,45 @@ export function listVoices(): SpeechSynthesisVoice[] {
   return voicesCache;
 }
 
-/** Resolve the SpeechSynthesisVoice to use: the user's pick, else a nice default. */
+/** Rank a voice for default selection — prefer modern "natural/neural" voices,
+ *  penalise the robotic legacy SAPI ones (e.g. "Microsoft David Desktop") that
+ *  make the buddy sound bad. Higher is better. */
+function scoreVoice(v: SpeechSynthesisVoice): number {
+  const n = (v.name || "").toLowerCase();
+  let s = 0;
+  if (!v.lang?.toLowerCase().startsWith("en")) s -= 100; // English first
+  if (/natural|neural|wavenet|studio/.test(n)) s += 60; // best modern engines
+  if (/online/.test(n)) s += 30; // cloud voices generally cleaner
+  if (/google/.test(n)) s += 40; // Chrome's Google voices are solid
+  if (/aria|jenny|libby|sonia|emma|ava|serena|samantha|allison/.test(n)) s += 25; // good named voices
+  if (/desktop|david|zira|mark|hazel|\beSpeak\b/i.test(n)) s -= 40; // robotic legacy
+  if (v.localService === false) s += 8; // online ≈ nicer (but still works offline-pick)
+  return s;
+}
+
+/** Resolve the SpeechSynthesisVoice to use: the user's pick, else the best-ranked. */
 function resolveVoice(): SpeechSynthesisVoice | null {
   if (!speechSupported()) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
+
   const uri = getBuddyVoiceURI();
   if (uri) {
     const chosen = voices.find((v) => v.voiceURI === uri);
     if (chosen) return chosen;
   }
-  const prefer = [
-    "Google UK English Female",
-    "Samantha",
-    "Karen",
-    "Google US English",
-    "Microsoft Aria Online (Natural) - English (United States)",
-  ];
-  return (
-    prefer.map((n) => voices.find((v) => v.name === n)).find(Boolean) ??
-    voices.find((v) => v.lang?.startsWith("en") && /female|aria|samantha|karen/i.test(v.name)) ??
-    voices.find((v) => v.lang?.startsWith("en")) ??
-    voices[0]
-  );
+
+  // Pick the highest-scoring voice (stable: ties keep getVoices() order).
+  let best = voices[0];
+  let bestScore = scoreVoice(best);
+  for (const v of voices) {
+    const sc = scoreVoice(v);
+    if (sc > bestScore) {
+      best = v;
+      bestScore = sc;
+    }
+  }
+  return best;
 }
 
 /* ---- Mute (reactive store so cards + settings stay in sync) ---- */
