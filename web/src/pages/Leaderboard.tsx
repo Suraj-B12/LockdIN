@@ -14,6 +14,7 @@ import { ScopeTabs, type LeaderboardScope } from "./leaderboard/ScopeTabs";
 import { YourRankCard } from "./leaderboard/YourRankCard";
 import { RankingRow } from "./leaderboard/RankingRow";
 import { GlobalRankingRow } from "./leaderboard/GlobalRankingRow";
+import { SquadChallenge } from "./leaderboard/SquadChallenge";
 import { AddFriend } from "./leaderboard/AddFriend";
 import { EmptyBoard } from "./leaderboard/EmptyBoard";
 import { PERIOD_PHRASE } from "./leaderboard/format";
@@ -104,6 +105,10 @@ function FriendsBoard({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_minmax(320px,380px)] lg:items-start">
       <div className="flex flex-col gap-5">
+        {/* Cooperative weekly goal — everyone's hours fill one shared bar. */}
+        <Reveal>
+          <SquadChallenge />
+        </Reveal>
         {yourRank != null && (
           <Reveal>
             <YourRankCard rank={yourRank} period={period} entry={yourEntry} total={entries.length} />

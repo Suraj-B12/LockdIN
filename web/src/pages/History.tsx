@@ -13,6 +13,7 @@ import { StatsRow } from "./history/StatsRow";
 import { SessionFeed } from "./history/SessionFeed";
 import { EmptyHistory } from "./history/EmptyHistory";
 import { WeeklyWrap } from "./history/WeeklyWrap";
+import { PatternInsights } from "./history/PatternInsights";
 import { aggregateByDay, buildHeatmap, computeStats } from "./history/dates";
 
 const FETCH_LIMIT = 200;
@@ -64,6 +65,11 @@ export function History() {
             {/* Spotify-Wrapped-style recap of the last 7 days. */}
             <Reveal>
               <WeeklyWrap sessions={sessions} buddy={buddy} />
+            </Reveal>
+
+            {/* Pattern-coach insights derived from the full history. */}
+            <Reveal>
+              <PatternInsights sessions={sessions} />
             </Reveal>
 
             {/* Heatmap + stats live in one tall card. */}
