@@ -12,6 +12,7 @@
    ===================================================================== */
 import { useSyncExternalStore } from "react";
 import linesData from "./buddyLines.json";
+import voicesData from "./buddyVoices.json";
 
 export interface BuddyState {
   buddyName?: string;
@@ -115,113 +116,87 @@ export function cancelSpeech(): void {
   }
 }
 
-/* ---- Style presets (rate/pitch personalities) ---- */
-export interface BuddyStyle {
+/* ---- Premium voices + tones (single source of truth: buddyVoices.json) ---- */
+export interface BuddyVoice {
   id: string;
   label: string;
+  sub: string;
+  gemini: string;
+  desc: string;
+}
+export interface BuddyTone {
+  id: string;
+  label: string;
+  prompt: string;
   rate: number;
   pitch: number;
-  hint: string;
 }
 
-export const BUDDY_STYLES: BuddyStyle[] = [
-  // Pitches kept close to natural (1.0) — high pitch on synthetic voices reads
-  // as "chipmunk". Style is conveyed more by rate than by extreme pitch.
-  { id: "warm", label: "Warm", rate: 1.0, pitch: 1.03, hint: "Friendly and steady" },
-  { id: "cheerful", label: "Cheerful", rate: 1.07, pitch: 1.15, hint: "Bright and upbeat" },
-  { id: "calm", label: "Calm", rate: 0.9, pitch: 0.98, hint: "Soft and soothing" },
-  { id: "energetic", label: "Energetic", rate: 1.2, pitch: 1.12, hint: "Fast and hyped" },
-  { id: "deep", label: "Deep", rate: 0.95, pitch: 0.82, hint: "Low and grounded" },
-];
-const DEFAULT_STYLE = "warm";
+export const BUDDY_VOICES: BuddyVoice[] = (voicesData.voices as BuddyVoice[]) ?? [];
+export const BUDDY_TONES: BuddyTone[] = (voicesData.tones as BuddyTone[]) ?? [];
+const AUDIO_EXT: string = (voicesData as { ext?: string }).ext || "mp3";
+const DEFAULT_VOICE: string =
+  (voicesData as { defaultVoice?: string }).defaultVoice || BUDDY_VOICES[0]?.id || "f-warm";
+const DEFAULT_TONE: string =
+  (voicesData as { defaultTone?: string }).defaultTone || BUDDY_TONES[0]?.id || "cheerful";
 
-const STYLE_KEY = "lockdin:buddyStyle";
-const VOICE_KEY = "lockdin:buddyVoiceURI";
+const VOICE_KEY = "lockdin:buddyVoice";
+const TONE_KEY = "lockdin:buddyTone";
 const MUTE_KEY = "lockdin:buddyMuted";
 
-export function getBuddyStyleId(): string {
+export function getBuddyVoice(): string {
   try {
-    return localStorage.getItem(STYLE_KEY) || DEFAULT_STYLE;
+    return localStorage.getItem(VOICE_KEY) || DEFAULT_VOICE;
   } catch {
-    return DEFAULT_STYLE;
+    return DEFAULT_VOICE;
   }
 }
-export function setBuddyStyleId(id: string): void {
+export function setBuddyVoice(id: string): void {
   try {
-    localStorage.setItem(STYLE_KEY, id);
-  } catch {
-    /* ignore */
-  }
-}
-function currentStyle(): BuddyStyle {
-  return BUDDY_STYLES.find((s) => s.id === getBuddyStyleId()) ?? BUDDY_STYLES[0];
-}
-
-export function getBuddyVoiceURI(): string | null {
-  try {
-    return localStorage.getItem(VOICE_KEY);
-  } catch {
-    return null;
-  }
-}
-export function setBuddyVoiceURI(uri: string | null): void {
-  try {
-    if (uri) localStorage.setItem(VOICE_KEY, uri);
-    else localStorage.removeItem(VOICE_KEY);
+    localStorage.setItem(VOICE_KEY, id);
   } catch {
     /* ignore */
   }
 }
-
-/** Available voices, English first, for the picker. Empty until voices load.
- *  CACHED: useSyncExternalStore requires a stable reference between changes, so
- *  we recompute only on voiceschanged (see below), not on every read. */
-const EMPTY_VOICES: SpeechSynthesisVoice[] = [];
-let voicesCache: SpeechSynthesisVoice[] | null = null;
-
-function computeVoices(): SpeechSynthesisVoice[] {
-  if (!speechSupported()) return EMPTY_VOICES;
-  const all = window.speechSynthesis.getVoices() || [];
-  if (!all.length) return EMPTY_VOICES;
-  const en = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
-  const rest = all.filter((v) => !v.lang?.toLowerCase().startsWith("en"));
-  return [...en, ...rest];
+export function getBuddyTone(): string {
+  try {
+    return localStorage.getItem(TONE_KEY) || DEFAULT_TONE;
+  } catch {
+    return DEFAULT_TONE;
+  }
+}
+export function setBuddyTone(id: string): void {
+  try {
+    localStorage.setItem(TONE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+function currentTone(): BuddyTone | undefined {
+  return BUDDY_TONES.find((t) => t.id === getBuddyTone()) ?? BUDDY_TONES[0];
 }
 
-export function listVoices(): SpeechSynthesisVoice[] {
-  if (voicesCache === null) voicesCache = computeVoices();
-  return voicesCache;
-}
+/* ---- Web Speech fallback voice (used when premium audio is unavailable) ---- */
 
-/** Rank a voice for default selection — prefer modern "natural/neural" voices,
- *  penalise the robotic legacy SAPI ones (e.g. "Microsoft David Desktop") that
- *  make the buddy sound bad. Higher is better. */
+/** Rank a device voice — prefer modern natural/neural voices, penalise robotic
+ *  legacy SAPI ones ("Microsoft David/Zira Desktop"). Higher is better. */
 function scoreVoice(v: SpeechSynthesisVoice): number {
   const n = (v.name || "").toLowerCase();
   let s = 0;
-  if (!v.lang?.toLowerCase().startsWith("en")) s -= 100; // English first
-  if (/natural|neural|wavenet|studio/.test(n)) s += 60; // best modern engines
-  if (/online/.test(n)) s += 30; // cloud voices generally cleaner
-  if (/google/.test(n)) s += 40; // Chrome's Google voices are solid
-  if (/aria|jenny|libby|sonia|emma|ava|serena|samantha|allison/.test(n)) s += 25; // good named voices
-  if (/desktop|david|zira|mark|hazel|\beSpeak\b/i.test(n)) s -= 40; // robotic legacy
-  if (v.localService === false) s += 8; // online ≈ nicer (but still works offline-pick)
+  if (!v.lang?.toLowerCase().startsWith("en")) s -= 100;
+  if (/natural|neural|wavenet|studio/.test(n)) s += 60;
+  if (/online/.test(n)) s += 30;
+  if (/google/.test(n)) s += 40;
+  if (/aria|jenny|libby|sonia|emma|ava|serena|samantha|allison/.test(n)) s += 25;
+  if (/desktop|david|zira|mark|hazel|eSpeak/i.test(n)) s -= 40;
+  if (v.localService === false) s += 8;
   return s;
 }
 
-/** Resolve the SpeechSynthesisVoice to use: the user's pick, else the best-ranked. */
 function resolveVoice(): SpeechSynthesisVoice | null {
   if (!speechSupported()) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-
-  const uri = getBuddyVoiceURI();
-  if (uri) {
-    const chosen = voices.find((v) => v.voiceURI === uri);
-    if (chosen) return chosen;
-  }
-
-  // Pick the highest-scoring voice (stable: ties keep getVoices() order).
   let best = voices[0];
   let bestScore = scoreVoice(best);
   for (const v of voices) {
@@ -266,8 +241,8 @@ export function useBuddyMuted(): boolean {
 }
 
 /**
- * Speak a line aloud (best-effort). No-ops when unsupported or muted (unless
- * `force`, used by the Manage preview). Cancels any in-flight utterance first.
+ * Speak a line via Web Speech (the on-device FALLBACK voice). No-ops when
+ * unsupported or muted (unless `force`). Uses the selected tone's rate/pitch.
  */
 export function speakLine(text: string, opts?: { force?: boolean }): void {
   try {
@@ -278,9 +253,9 @@ export function speakLine(text: string, opts?: { force?: boolean }): void {
     const u = new SpeechSynthesisUtterance(text);
     const v = resolveVoice();
     if (v) u.voice = v;
-    const style = currentStyle();
-    u.rate = style.rate;
-    u.pitch = style.pitch;
+    const tone = currentTone();
+    u.rate = tone?.rate ?? 1;
+    u.pitch = tone?.pitch ?? 1;
     u.volume = 1;
     synth.speak(u);
   } catch {
@@ -290,16 +265,13 @@ export function speakLine(text: string, opts?: { force?: boolean }): void {
 
 /* ---------------------------------------------------------------------------
    Premium pre-generated audio (with Web-Speech fallback).
-   Each line has a stable id → /audio/buddy/<pack>/<id>.<ext>. If the file is
-   missing (not generated/deployed yet) or playback fails, we fall back to the
-   on-device Web Speech voice — so the buddy always talks, and silently upgrades
-   to premium the moment the audio is deployed.
+   Path: /audio/buddy/<voice>/<tone>/<lineId>.<ext> — the selected voice + tone.
+   If the file is missing (not generated/deployed yet) or playback fails, we fall
+   back to the on-device Web Speech voice (with the tone's rate/pitch) — so the
+   buddy always talks, and silently upgrades to premium once the audio is deployed.
    ------------------------------------------------------------------------- */
-const AUDIO_PACK: string = (linesData as { pack?: string }).pack || "default";
-const AUDIO_EXT = "wav"; // Gemini TTS output; matches the generation script
-
 export function audioUrlFor(id: string): string {
-  return `/audio/buddy/${AUDIO_PACK}/${id}.${AUDIO_EXT}`;
+  return `/audio/buddy/${getBuddyVoice()}/${getBuddyTone()}/${id}.${AUDIO_EXT}`;
 }
 
 let currentAudio: HTMLAudioElement | null = null;
@@ -331,15 +303,18 @@ export function playBuddyLine(line: BuddyLine, opts?: { force?: boolean }): void
     cancelSpeech();
     stopAudio();
 
-    if (typeof Audio === "undefined" || missingAudio.has(line.id)) {
+    // Key the missing-set by full URL: the same line id maps to different files
+    // per voice/tone, so a miss for one pack must not blacklist the others.
+    const url = audioUrlFor(line.id);
+    if (typeof Audio === "undefined" || missingAudio.has(url)) {
       speakLine(line.text, opts);
       return;
     }
 
-    const audio = new Audio(audioUrlFor(line.id));
+    const audio = new Audio(url);
     currentAudio = audio;
     const fallback = () => {
-      missingAudio.add(line.id); // don't retry this file this session
+      missingAudio.add(url); // don't retry this file this session
       if (currentAudio === audio) currentAudio = null;
       speakLine(line.text, opts);
     };
@@ -355,22 +330,5 @@ export function playBuddyLine(line: BuddyLine, opts?: { force?: boolean }): void
     } catch {
       /* delight layer — never throw */
     }
-  }
-}
-
-/* Voices populate asynchronously — notify any voice-picker listeners on load. */
-const voiceListeners = new Set<() => void>();
-export function subscribeVoices(cb: () => void): () => void {
-  voiceListeners.add(cb);
-  return () => voiceListeners.delete(cb);
-}
-if (speechSupported()) {
-  try {
-    window.speechSynthesis.onvoiceschanged = () => {
-      voicesCache = computeVoices(); // refresh the cached (stable-ref) list
-      voiceListeners.forEach((l) => l());
-    };
-  } catch {
-    /* ignore */
   }
 }

@@ -1,0 +1,18 @@
+{
+  "ext": "mp3",
+  "defaultVoice": "f-warm",
+  "defaultTone": "cheerful",
+  "voices": [
+    { "id": "m-deep", "label": "Deep", "sub": "Male", "gemini": "Charon", "desc": "Male · normal deep" },
+    { "id": "m-deepest", "label": "Deepest", "sub": "Male", "gemini": "Algenib", "desc": "Male · fully deep" },
+    { "id": "f-warm", "label": "Warm", "sub": "Female", "gemini": "Sulafat", "desc": "Female · highly pleasant" },
+    { "id": "f-bright", "label": "Bright", "sub": "Female", "gemini": "Leda", "desc": "Female · high-pitched" },
+    { "id": "f-clear", "label": "Clear", "sub": "Female", "gemini": "Autonoe", "desc": "Female · slightly high" }
+  ],
+  "tones": [
+    { "id": "energetic", "label": "Energetic", "prompt": "in an energetic, fast, hyped-up tone", "rate": 1.2, "pitch": 1.12 },
+    { "id": "cheerful", "label": "Cheerful", "prompt": "in a cheerful, bright, smiling tone", "rate": 1.07, "pitch": 1.15 },
+    { "id": "calm", "label": "Calm", "prompt": "in a calm, soft, soothing, gentle tone", "rate": 0.9, "pitch": 0.98 },
+    { "id": "deep", "label": "Deep", "prompt": "in a slow, deep, grounded, serious tone", "rate": 0.95, "pitch": 0.82 }
+  ]
+}
