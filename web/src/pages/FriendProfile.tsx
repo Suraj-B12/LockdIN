@@ -17,7 +17,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { Avatar, Button, Card, Reveal, RevealChild, Skeleton } from "@/components/ui";
-import { useUserOverview } from "@/lib/queries";
+import { useUserOverview, useSessionReactions, useToggleReaction } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
 import { getBuddyAvatar, moodLabel } from "@/lib/buddy";
 import type { BuddyResponse } from "@/lib/types";
@@ -43,6 +43,11 @@ export function FriendProfile() {
     const byDay = aggregateByDay(s);
     return { heatmap: buildHeatmap(byDay), stats: computeStats(s, byDay), sessions: s };
   }, [data]);
+
+  // Reactions: load state for the shown sessions; tapping toggles (give-only).
+  const sessionIds = useMemo(() => sessions.map((s) => s.id), [sessions]);
+  const { data: reactions } = useSessionReactions(sessionIds);
+  const toggleReaction = useToggleReaction();
 
   return (
     <div className="mx-auto w-full max-w-[1180px]">
@@ -137,7 +142,11 @@ export function FriendProfile() {
 
               <RevealChild>
                 <Card>
-                  <SessionFeed sessions={sessions} />
+                  <SessionFeed
+                    sessions={sessions}
+                    reactions={reactions}
+                    onReact={(sessionId, emoji) => toggleReaction.mutate({ sessionId, emoji })}
+                  />
                 </Card>
               </RevealChild>
             </>

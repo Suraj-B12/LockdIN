@@ -9,7 +9,7 @@ from services.ai_scorer import check_ai_health
 from services.scheduler import start_scheduler, stop_scheduler
 
 # Import routers
-from routers import auth, sessions, users, leaderboard, buddy, friends, notifications, cron, rooms
+from routers import auth, sessions, users, leaderboard, buddy, friends, notifications, cron, rooms, reactions
 
 
 @asynccontextmanager
@@ -68,6 +68,7 @@ app.include_router(friends.router)
 app.include_router(notifications.router)
 app.include_router(cron.router)
 app.include_router(rooms.router)
+app.include_router(reactions.router)
 
 
 @app.get("/health")

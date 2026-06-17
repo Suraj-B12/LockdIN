@@ -7,8 +7,9 @@
 import { useState } from "react";
 import { CaretDown } from "@phosphor-icons/react";
 import { Badge, Button } from "@/components/ui";
+import { ReactionBar } from "@/components/ReactionBar";
 import { cn } from "@/lib/cn";
-import type { SessionResponse } from "@/lib/types";
+import type { SessionResponse, ReactionMap, ReactionEmoji } from "@/lib/types";
 import { relativeDay, clockTime, formatDuration } from "./dates";
 
 const PAGE = 8;
@@ -25,7 +26,14 @@ function scoreTone(score: number | null): {
   return { tone: "neutral", label: `${score}` };
 }
 
-export function SessionFeed({ sessions }: { sessions: SessionResponse[] }) {
+export interface SessionFeedProps {
+  sessions: SessionResponse[];
+  /** When set, each row shows a give-only ReactionBar (used on friend profiles). */
+  reactions?: ReactionMap;
+  onReact?: (sessionId: string, emoji: ReactionEmoji) => void;
+}
+
+export function SessionFeed({ sessions, reactions, onReact }: SessionFeedProps) {
   const [visible, setVisible] = useState(PAGE);
   const shown = sessions.slice(0, visible);
   const hasMore = visible < sessions.length;
@@ -41,7 +49,13 @@ export function SessionFeed({ sessions }: { sessions: SessionResponse[] }) {
 
       <ul className="flex flex-col">
         {shown.map((s, i) => (
-          <SessionRow key={s.id} session={s} isLast={i === shown.length - 1 && !hasMore} />
+          <SessionRow
+            key={s.id}
+            session={s}
+            isLast={i === shown.length - 1 && !hasMore}
+            reactionState={reactions?.[s.id]}
+            onReact={onReact}
+          />
         ))}
       </ul>
 
@@ -61,7 +75,17 @@ export function SessionFeed({ sessions }: { sessions: SessionResponse[] }) {
   );
 }
 
-function SessionRow({ session, isLast }: { session: SessionResponse; isLast: boolean }) {
+function SessionRow({
+  session,
+  isLast,
+  reactionState,
+  onReact,
+}: {
+  session: SessionResponse;
+  isLast: boolean;
+  reactionState?: import("@/lib/types").ReactionState;
+  onReact?: (sessionId: string, emoji: ReactionEmoji) => void;
+}) {
   const stamp = session.finished_at ?? session.started_at;
   const { tone, label } = scoreTone(session.ai_score);
   const log = session.work_log?.trim();
@@ -101,6 +125,11 @@ function SessionRow({ session, isLast }: { session: SessionResponse; isLast: boo
         </p>
         {session.ai_summary && (
           <p className="mt-1 truncate text-xs text-ink-faint">{session.ai_summary}</p>
+        )}
+        {onReact && (
+          <div className="mt-2.5">
+            <ReactionBar state={reactionState} onToggle={(emoji) => onReact(session.id, emoji)} />
+          </div>
         )}
       </div>
 

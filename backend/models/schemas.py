@@ -166,6 +166,25 @@ class FriendActivityResponse(BaseModel):
     items: list[FriendActivityItem] = Field(default_factory=list)
 
 
+# ========== REACTIONS ==========
+
+REACTION_EMOJI = ("fire", "clap", "muscle", "eyes", "brain", "hundred")
+
+
+class ReactionToggle(BaseModel):
+    emoji: str = Field(..., pattern="^(fire|clap|muscle|eyes|brain|hundred)$")
+
+
+class ReactionState(BaseModel):
+    # emoji -> count for this session, plus the emoji the requester has set.
+    counts: dict[str, int] = Field(default_factory=dict)
+    mine: list[str] = Field(default_factory=list)
+
+
+class ReactionBatchRequest(BaseModel):
+    session_ids: list[UUID] = Field(default_factory=list)
+
+
 # ========== ROOMS (Lock In Together) ==========
 
 class RoomParticipantOut(BaseModel):

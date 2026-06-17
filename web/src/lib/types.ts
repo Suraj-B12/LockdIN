@@ -186,6 +186,17 @@ export interface FriendProfileResponse {
   shared_streak?: number | null;
 }
 
+/* ---- Reactions ---- */
+export type ReactionEmoji = "fire" | "clap" | "muscle" | "eyes" | "brain" | "hundred";
+
+export interface ReactionState {
+  counts: Partial<Record<ReactionEmoji, number>>;
+  mine: ReactionEmoji[];
+}
+
+/** session_id → its reaction state. */
+export type ReactionMap = Record<string, ReactionState>;
+
 /* ---- Rooms (Lock In Together) ---- */
 export interface RoomParticipant {
   user_id: string;

@@ -31,6 +31,9 @@ import type {
   RoomResponse,
   RoomJoinBody,
   RoomHeartbeatBody,
+  ReactionState,
+  ReactionMap,
+  ReactionEmoji,
 } from "./types";
 
 /* ---- Query keys (stable, centralized) ---- */
@@ -418,5 +421,43 @@ export function useRoomHeartbeat() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: RoomHeartbeatBody }) =>
       api.post<{ ok: boolean }>(`/rooms/${id}/heartbeat`, body),
+  });
+}
+
+/* =====================================================================
+   Reactions
+   ===================================================================== */
+
+/** POST /reactions/batch → { session_id: ReactionState }. One call for a feed. */
+export function useSessionReactions(sessionIds: string[]) {
+  const key = [...sessionIds].sort().join(",");
+  return useQuery({
+    queryKey: ["reactions", "batch", key],
+    queryFn: () => api.post<ReactionMap>("/reactions/batch", { session_ids: sessionIds }),
+    enabled: sessionIds.length > 0,
+    staleTime: 30_000,
+  });
+}
+
+/** POST /reactions/{sessionId} {emoji} → toggle (optimistic, give-only). */
+export function useToggleReaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, emoji }: { sessionId: string; emoji: ReactionEmoji }) =>
+      api.post<ReactionState>(`/reactions/${sessionId}`, { emoji }),
+    onMutate: ({ sessionId, emoji }) => {
+      // Optimistically toggle across every cached batch map for instant feedback.
+      qc.setQueriesData<ReactionMap>({ queryKey: ["reactions", "batch"] }, (old) => {
+        if (!old) return old;
+        const st = old[sessionId] ?? { counts: {}, mine: [] };
+        const has = st.mine.includes(emoji);
+        const counts = { ...st.counts };
+        counts[emoji] = (counts[emoji] ?? 0) + (has ? -1 : 1);
+        if ((counts[emoji] ?? 0) <= 0) delete counts[emoji];
+        const mine = has ? st.mine.filter((e) => e !== emoji) : [...st.mine, emoji];
+        return { ...old, [sessionId]: { counts, mine } };
+      });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["reactions", "batch"] }),
   });
 }
