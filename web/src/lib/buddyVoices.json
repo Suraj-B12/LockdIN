@@ -3,11 +3,11 @@
   "defaultVoice": "f-warm",
   "defaultTone": "cheerful",
   "voices": [
-    { "id": "m-deep", "label": "Deep", "sub": "Male", "gemini": "Charon", "desc": "Male · normal deep" },
-    { "id": "m-deepest", "label": "Deepest", "sub": "Male", "gemini": "Algenib", "desc": "Male · fully deep" },
-    { "id": "f-warm", "label": "Warm", "sub": "Female", "gemini": "Sulafat", "desc": "Female · highly pleasant" },
-    { "id": "f-bright", "label": "Bright", "sub": "Female", "gemini": "Leda", "desc": "Female · high-pitched" },
-    { "id": "f-clear", "label": "Clear", "sub": "Female", "gemini": "Autonoe", "desc": "Female · slightly high" }
+    { "id": "m-deep", "label": "Deep", "sub": "Male", "gemini": "Charon", "desc": "Male · normal deep", "fbPitch": 0.9 },
+    { "id": "m-deepest", "label": "Deepest", "sub": "Male", "gemini": "Algenib", "desc": "Male · fully deep", "fbPitch": 0.76 },
+    { "id": "f-warm", "label": "Warm", "sub": "Female", "gemini": "Sulafat", "desc": "Female · highly pleasant", "fbPitch": 1.0 },
+    { "id": "f-bright", "label": "Bright", "sub": "Female", "gemini": "Leda", "desc": "Female · high-pitched", "fbPitch": 1.2 },
+    { "id": "f-clear", "label": "Clear", "sub": "Female", "gemini": "Autonoe", "desc": "Female · slightly high", "fbPitch": 1.07 }
   ],
   "tones": [
     { "id": "energetic", "label": "Energetic", "prompt": "in an energetic, fast, hyped-up tone", "rate": 1.2, "pitch": 1.12 },

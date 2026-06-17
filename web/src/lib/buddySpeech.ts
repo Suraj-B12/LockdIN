@@ -123,6 +123,8 @@ export interface BuddyVoice {
   sub: string;
   gemini: string;
   desc: string;
+  /** Base pitch for the on-device fallback voice (steers gender/timbre feel). */
+  fbPitch?: number;
 }
 export interface BuddyTone {
   id: string;
@@ -175,6 +177,32 @@ export function setBuddyTone(id: string): void {
 function currentTone(): BuddyTone | undefined {
   return BUDDY_TONES.find((t) => t.id === getBuddyTone()) ?? BUDDY_TONES[0];
 }
+function currentVoice(): BuddyVoice | undefined {
+  return BUDDY_VOICES.find((v) => v.id === getBuddyVoice()) ?? BUDDY_VOICES[0];
+}
+
+type Gender = "male" | "female" | "unknown";
+
+/** Best-effort gender of the SELECTED premium voice (from its `sub`). */
+function selectedGender(): Gender {
+  const sub = (currentVoice()?.sub || "").toLowerCase();
+  if (sub.startsWith("m")) return "male";
+  if (sub.startsWith("f")) return "female";
+  return "unknown";
+}
+
+/** Heuristically classify a device voice by name. "female" is checked first
+ *  (it contains the substring "male"). Unknown when no token matches. */
+function voiceGender(v: SpeechSynthesisVoice): Gender {
+  const n = (v.name || "").toLowerCase();
+  const female =
+    /female|zira|aria|jenny|michelle|hazel|susan|heera|samantha|karen|moira|tessa|fiona|veena|victoria|allison|\bava\b|serena|sonia|libby|emma|catherine|linda|amber|clara|nora|\bsara\b|paloma|elsa|joanna|salli|kendra|kimberly|\bivy\b|\bzoe\b|neerja/;
+  const male =
+    /\bmale\b|david|\bmark\b|\bguy\b|george|james|\bryan\b|\bsean\b|richard|\bpaul\b|\beric\b|daniel|oliver|thomas|\bfred\b|gordon|\blee\b|william|\balex\b|aaron|brian|\bliam\b|matthew|justin|kevin|arthur|rishi|prabhat/;
+  if (female.test(n)) return "female";
+  if (male.test(n)) return "male";
+  return "unknown";
+}
 
 /* ---- Web Speech fallback voice (used when premium audio is unavailable) ---- */
 
@@ -193,20 +221,29 @@ function scoreVoice(v: SpeechSynthesisVoice): number {
   return s;
 }
 
+/** Pick the best device voice that MATCHES the selected voice's gender — so a
+ *  Male premium voice falls back to a male device voice (not a female default). */
 function resolveVoice(): SpeechSynthesisVoice | null {
   if (!speechSupported()) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-  let best = voices[0];
-  let bestScore = scoreVoice(best);
+
+  const want = selectedGender();
+  let best: SpeechSynthesisVoice | null = null;
+  let bestScore = -Infinity;
   for (const v of voices) {
-    const sc = scoreVoice(v);
+    let sc = scoreVoice(v);
+    if (want !== "unknown") {
+      const g = voiceGender(v);
+      if (g === want) sc += 120; // strongly prefer a matching-gender voice
+      else if (g !== "unknown") sc -= 120; // strongly avoid the opposite gender
+    }
     if (sc > bestScore) {
       best = v;
       bestScore = sc;
     }
   }
-  return best;
+  return best ?? voices[0];
 }
 
 /* ---- Mute (reactive store so cards + settings stay in sync) ---- */
@@ -254,8 +291,13 @@ export function speakLine(text: string, opts?: { force?: boolean }): void {
     const v = resolveVoice();
     if (v) u.voice = v;
     const tone = currentTone();
+    const voice = currentVoice();
+    // Voice sets the base pitch (timbre/gender feel); tone nudges it + sets the
+    // delivery speed. Clamp to a natural range so it never goes chipmunk/robotic.
+    const basePitch = voice?.fbPitch ?? 1;
+    const pitch = basePitch + ((tone?.pitch ?? 1) - 1);
     u.rate = tone?.rate ?? 1;
-    u.pitch = tone?.pitch ?? 1;
+    u.pitch = Math.max(0.5, Math.min(1.6, pitch));
     u.volume = 1;
     synth.speak(u);
   } catch {
