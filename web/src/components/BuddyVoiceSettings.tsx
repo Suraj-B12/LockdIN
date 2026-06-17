@@ -149,7 +149,8 @@ export function BuddyVoiceSettings() {
         Preview voice
       </button>
       <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-        Voices come from your device, so the list varies by browser. Preview plays even when muted.
+        Your buddy uses a premium voice when available; these set the on-device fallback (the list
+        varies by browser). Preview plays the fallback, even when muted.
       </p>
     </div>
   );

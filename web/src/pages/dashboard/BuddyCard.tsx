@@ -14,10 +14,11 @@ import { useBuddy } from "@/lib/queries";
 import { getBuddyAvatar, moodLabel } from "@/lib/buddy";
 import {
   pickBuddyLine,
-  speakLine,
+  playBuddyLine,
   useBuddyMuted,
   setBuddyMuted,
   canHoverPointer,
+  type BuddyLine,
 } from "@/lib/buddySpeech";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { CardHead } from "./parts";
@@ -26,7 +27,7 @@ export function BuddyCard() {
   const reduce = useReducedMotion();
   const { data: buddy, isLoading, isError } = useBuddy();
 
-  const [line, setLine] = useState<string | null>(null);
+  const [line, setLine] = useState<BuddyLine | null>(null);
   const [nonce, setNonce] = useState(0);
   const muted = useBuddyMuted();
 
@@ -40,7 +41,7 @@ export function BuddyCard() {
     });
     setLine(next);
     setNonce((n) => n + 1);
-    if (speak) speakLine(next);
+    if (speak) playBuddyLine(next);
   };
   const talk = () => say(true);
   const peek = () => {
@@ -48,7 +49,7 @@ export function BuddyCard() {
     if (canHoverPointer() && !line) say(false);
   };
   const replay = () => {
-    if (line) speakLine(line);
+    if (line) playBuddyLine(line);
   };
   const toggleMute = () => setBuddyMuted(!muted);
 
@@ -94,7 +95,7 @@ export function BuddyCard() {
                 <BuddySpeechBubble
                   key="buddy-bubble"
                   className="absolute bottom-full left-1/2 z-30 mb-2"
-                  text={line}
+                  text={line.text}
                   nonce={nonce}
                   muted={muted}
                   onReplay={replay}

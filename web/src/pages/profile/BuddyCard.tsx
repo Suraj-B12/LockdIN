@@ -15,11 +15,12 @@ import { useUpdateBuddy } from "@/lib/queries";
 import { getBuddyAvatar, moodLabel, moodEmoji, MOOD_MIN, MOOD_MAX } from "@/lib/buddy";
 import {
   pickBuddyLine,
-  speakLine,
+  playBuddyLine,
   useBuddyMuted,
   setBuddyMuted,
   canHoverPointer,
   type BuddyState,
+  type BuddyLine,
 } from "@/lib/buddySpeech";
 import type { BuddyResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
@@ -38,7 +39,7 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
   const mood = buddy.mood_level;
 
   // ---- Talking buddy: tap (or hover) the avatar for a motivational line ----
-  const [line, setLine] = useState<string | null>(null);
+  const [line, setLine] = useState<BuddyLine | null>(null);
   const [nonce, setNonce] = useState(0);
   const muted = useBuddyMuted();
 
@@ -53,7 +54,7 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
     const next = pickBuddyLine(buddyState);
     setLine(next);
     setNonce((n) => n + 1);
-    if (speak) speakLine(next);
+    if (speak) playBuddyLine(next);
   };
   const talk = () => say(true); // click → spoken
   const peek = () => {
@@ -62,7 +63,7 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
     if (canHoverPointer() && !line) say(false);
   };
   const replay = () => {
-    if (line) speakLine(line);
+    if (line) playBuddyLine(line);
   };
   const toggleMute = () => setBuddyMuted(!muted);
 
@@ -91,7 +92,7 @@ export function BuddyCard({ buddy }: BuddyCardProps) {
               <BuddySpeechBubble
                 key="buddy-bubble"
                 className="absolute bottom-full left-0 z-30 mb-3"
-                text={line}
+                text={line.text}
                 nonce={nonce}
                 muted={muted}
                 onReplay={replay}

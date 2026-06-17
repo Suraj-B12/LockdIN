@@ -1,0 +1,65 @@
+{
+  "pack": "default",
+  "lines": [
+    { "id": "greet-1", "tags": ["greeting"], "text": "There you are. Ready to lock in?" },
+    { "id": "greet-2", "tags": ["greeting"], "text": "Hey, you. Let's make this one count." },
+    { "id": "greet-3", "tags": ["greeting"], "text": "Back again — I like your style." },
+    { "id": "greet-4", "tags": ["greeting"], "text": "Good to see you. Shall we begin?" },
+    { "id": "greet-5", "tags": ["greeting"], "text": "You showed up. That's already the hard part." },
+    { "id": "greet-6", "tags": ["greeting"], "text": "Let's turn minutes into momentum." },
+    { "id": "greet-7", "tags": ["greeting"], "text": "I've been waiting for you. Let's go." },
+    { "id": "greet-8", "tags": ["greeting"], "text": "One focused session, just you and me." },
+
+    { "id": "high-1", "tags": ["mood-high"], "text": "Look at us go — I'm genuinely proud of you." },
+    { "id": "high-2", "tags": ["mood-high"], "text": "You're on fire. Let's keep this flame alive." },
+    { "id": "high-3", "tags": ["mood-high"], "text": "This is the best I've felt in ages. More?" },
+    { "id": "high-4", "tags": ["mood-high"], "text": "We're unstoppable right now. Don't stop." },
+    { "id": "high-5", "tags": ["mood-high"], "text": "I'm beaming. You earned every bit of this." },
+    { "id": "high-6", "tags": ["mood-high"], "text": "Whatever you're doing, keep doing exactly that." },
+
+    { "id": "mid-1", "tags": ["mood-mid"], "text": "Steady wins it. One good session and I'm glowing." },
+    { "id": "mid-2", "tags": ["mood-mid"], "text": "We've got this. Pick one thing and start." },
+    { "id": "mid-3", "tags": ["mood-mid"], "text": "Small and consistent beats big and rare. Let's go." },
+    { "id": "mid-4", "tags": ["mood-mid"], "text": "I'm feeling good — let's make me feel great." },
+    { "id": "mid-5", "tags": ["mood-mid"], "text": "Nice and easy. Just press start." },
+    { "id": "mid-6", "tags": ["mood-mid"], "text": "Momentum's a choice. Choose it with me." },
+
+    { "id": "low-1", "tags": ["mood-low"], "text": "I missed you. Let's start fresh — just one session." },
+    { "id": "low-2", "tags": ["mood-low"], "text": "No guilt, only forward. Begin again with me." },
+    { "id": "low-3", "tags": ["mood-low"], "text": "Rough patch? They pass. One session turns it around." },
+    { "id": "low-4", "tags": ["mood-low"], "text": "I'm a little down, but you always bring me back. Ready?" },
+    { "id": "low-5", "tags": ["mood-low"], "text": "Let's not chase yesterday. Let's just start today." },
+    { "id": "low-6", "tags": ["mood-low"], "text": "You came back. That matters more than any streak." },
+
+    { "id": "zero-1", "tags": ["streak-zero"], "text": "Every streak starts at one. Let's get ours today." },
+    { "id": "zero-2", "tags": ["streak-zero"], "text": "Clean slate. Day one is the best day to begin." },
+    { "id": "zero-3", "tags": ["streak-zero"], "text": "No streak yet — nothing to lose, everything to build." },
+    { "id": "zero-4", "tags": ["streak-zero"], "text": "Let's light the first spark. One session does it." },
+
+    { "id": "build-1", "tags": ["streak-building"], "text": "The habit is forming — let's feed it." },
+    { "id": "build-2", "tags": ["streak-building"], "text": "We're building something. Don't break the chain now." },
+    { "id": "build-3", "tags": ["streak-building"], "text": "A few days in and counting. Today keeps it alive." },
+    { "id": "build-4", "tags": ["streak-building"], "text": "Look at us stacking days. Let's add another." },
+
+    { "id": "strong-1", "tags": ["streak-strong"], "text": "You're not the person who started this. Keep going." },
+    { "id": "strong-2", "tags": ["streak-strong"], "text": "Showing up has become who you are. Keep it up." },
+    { "id": "strong-3", "tags": ["streak-strong"], "text": "This is rare air. Protect the streak." },
+    { "id": "strong-4", "tags": ["streak-strong"], "text": "We built this run together. Let's make it longer." },
+
+    { "id": "record-1", "tags": ["record"], "text": "A new record! I knew you had it in you." },
+    { "id": "record-2", "tags": ["record"], "text": "Your best run ever — soak it in, then continue." },
+    { "id": "record-3", "tags": ["record"], "text": "We've never been here before. This is history." },
+
+    { "id": "morn-1", "tags": ["morning"], "text": "Morning. Let's win the first hour and the day follows." },
+    { "id": "morn-2", "tags": ["morning"], "text": "Fresh start, fresh focus. Begin before the noise does." },
+    { "id": "morn-3", "tags": ["morning"], "text": "Early bird, deep work. Let's set the tone." },
+
+    { "id": "eve-1", "tags": ["evening"], "text": "One focused push before the day's done?" },
+    { "id": "eve-2", "tags": ["evening"], "text": "Evening's quiet — perfect for real work. Join me." },
+    { "id": "eve-3", "tags": ["evening"], "text": "Finish strong. A short session still counts." },
+
+    { "id": "late-1", "tags": ["latenight"], "text": "Burning the midnight oil? I'm right here with you." },
+    { "id": "late-2", "tags": ["latenight"], "text": "Late one tonight. Let's make it count, then rest." },
+    { "id": "late-3", "tags": ["latenight"], "text": "The world's asleep — your focus has the floor." }
+  ]
+}

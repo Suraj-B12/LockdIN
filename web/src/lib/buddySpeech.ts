@@ -11,6 +11,7 @@
    guilt/fear. The buddy mirrors YOUR consistency and cheers you on.
    ===================================================================== */
 import { useSyncExternalStore } from "react";
+import linesData from "./buddyLines.json";
 
 export interface BuddyState {
   buddyName?: string;
@@ -21,147 +22,68 @@ export interface BuddyState {
   hour?: number;
 }
 
-/* {streak} → current streak, {best} → longest, {name} → buddy name. */
-type Pool = string[];
+/** A single buddy line: a stable id (-> pre-generated audio file) + its text. */
+export interface BuddyLine {
+  id: string;
+  text: string;
+}
 
-const GREETINGS: Pool = [
-  "There you are. Ready to lock in?",
-  "Hey, you. Let's make this one count.",
-  "Back again — I like your style.",
-  "Good to see you. Shall we begin?",
-  "You showed up. That's already the hard part.",
-  "Let's turn minutes into momentum.",
-  "I've been waiting for you. Let's go.",
-  "One focused session, just you and me.",
-];
+interface RawLine {
+  id: string;
+  tags: string[];
+  text: string;
+}
 
-const MOOD_HIGH: Pool = [
-  // mood 8-10
-  "Look at us go — I'm genuinely proud of you.",
-  "You're on fire. Let's keep this flame alive.",
-  "This is the best I've felt in ages. More?",
-  "We're unstoppable right now. Don't stop.",
-  "I'm beaming. You earned every bit of this.",
-  "Whatever you're doing, keep doing exactly that.",
-];
+const ALL_LINES: RawLine[] = (linesData.lines as RawLine[]) ?? [];
 
-const MOOD_MID: Pool = [
-  // mood 4-7
-  "Steady wins it. One good session and I'm glowing.",
-  "We've got this. Pick one thing and start.",
-  "Small and consistent beats big and rare. Let's go.",
-  "I'm feeling good — let's make me feel great.",
-  "Nice and easy. Just press start.",
-  "Momentum's a choice. Choose it with me?",
-];
+function byTag(tag: string): RawLine[] {
+  return ALL_LINES.filter((l) => l.tags.includes(tag));
+}
 
-const MOOD_LOW: Pool = [
-  // mood 1-3
-  "I missed you. Let's start fresh — just one session.",
-  "No guilt, only forward. Begin again with me?",
-  "Rough patch? They pass. One session and we turn it around.",
-  "I'm a little down, but you always bring me back. Ready?",
-  "Let's not chase yesterday. Let's just start today.",
-  "You came back. That matters more than any streak.",
-];
-
-const STREAK_ZERO: Pool = [
-  "Every streak starts at one. Let's get ours today.",
-  "Clean slate. Day one is always the best day to begin.",
-  "No streak yet — perfect. Nothing to lose, everything to build.",
-  "Let's light the first spark. One session does it.",
-];
-
-const STREAK_BUILDING: Pool = [
-  // 1-6 days
-  "{streak} days in. The habit is forming — feed it.",
-  "We're {streak} deep. Don't break the chain now.",
-  "{streak} and counting. Today keeps it alive.",
-  "Look — {streak} days already. Let's stack another.",
-];
-
-const STREAK_STRONG: Pool = [
-  // 7+ days
-  "{streak} days. You're not the person who started this. Keep going.",
-  "{streak} straight days of showing up. That's who you are now.",
-  "{streak} days strong — this is rare air. Protect it.",
-  "We built {streak} days together. Let's make it {streak} plus one.",
-];
-
-const AT_RECORD: Pool = [
-  "A new record — {streak} days! I knew you had it in you.",
-  "{streak} days: your best run ever. Soak it in, then continue.",
-  "We've never been here before. {streak} days. History.",
-];
-
-const TIME_MORNING: Pool = [
-  "Morning. Let's win the first hour and the day follows.",
-  "Fresh start, fresh focus. Begin before the noise does.",
-  "Early bird, deep work. Let's set the tone.",
-];
-
-const TIME_EVENING: Pool = [
-  "One focused push before the day's done?",
-  "Evening's quiet — perfect for real work. Join me?",
-  "Finish strong. A short session still counts.",
-];
-
-const TIME_LATENIGHT: Pool = [
-  "Burning the midnight oil? I'm right here with you.",
-  "Late one tonight. Let's make it count, then rest.",
-  "The world's asleep — your focus has the floor.",
-];
-
-/** Remember the last few lines per device so we never repeat back-to-back. */
+/** Remember the last few line ids per device so we never repeat back-to-back. */
 const recent: string[] = [];
 const RECENT_MAX = 12;
 
-function fill(line: string, s: BuddyState): string {
-  return line
-    .split("{streak}").join(String(s.currentStreak))
-    .split("{best}").join(String(s.longestStreak))
-    .split("{name}").join(s.buddyName?.trim() || "Buddy");
-}
-
-/** Weighted pool selection: build a candidate list from the buddy's state. */
-function candidatePools(s: BuddyState): Pool[] {
+/** Weighted tag selection from the buddy's state (mood / streak / time). */
+function candidatePool(s: BuddyState): RawLine[] {
   const hour = s.hour ?? new Date().getHours();
-  const pools: Pool[] = [GREETINGS];
+  const tags: string[] = ["greeting"];
 
-  if (s.moodLevel >= 8) pools.push(MOOD_HIGH, MOOD_HIGH);
-  else if (s.moodLevel >= 4) pools.push(MOOD_MID);
-  else pools.push(MOOD_LOW, MOOD_LOW);
+  if (s.moodLevel >= 8) tags.push("mood-high", "mood-high");
+  else if (s.moodLevel >= 4) tags.push("mood-mid");
+  else tags.push("mood-low", "mood-low");
 
-  if (s.currentStreak <= 0) pools.push(STREAK_ZERO);
-  else if (s.currentStreak < 7) pools.push(STREAK_BUILDING);
-  else pools.push(STREAK_STRONG);
+  if (s.currentStreak <= 0) tags.push("streak-zero");
+  else if (s.currentStreak < 7) tags.push("streak-building");
+  else tags.push("streak-strong");
 
   // A genuine personal best earns its own celebratory pool (weighted heavier).
   if (s.currentStreak > 0 && s.currentStreak >= s.longestStreak) {
-    pools.push(AT_RECORD, AT_RECORD);
+    tags.push("record", "record");
   }
 
-  if (hour >= 5 && hour < 11) pools.push(TIME_MORNING);
-  else if (hour >= 18 && hour < 23) pools.push(TIME_EVENING);
-  else if (hour >= 23 || hour < 5) pools.push(TIME_LATENIGHT);
+  if (hour >= 5 && hour < 11) tags.push("morning");
+  else if (hour >= 18 && hour < 23) tags.push("evening");
+  else if (hour >= 23 || hour < 5) tags.push("latenight");
 
-  return pools;
+  return tags.flatMap(byTag);
 }
 
 /**
- * Pick a buddy line for the given state, avoiding the most recent ones so it
+ * Pick a buddy line for the given state, avoiding the most recent ids so it
  * never repeats back-to-back. Always returns *something* (best-effort).
  */
-export function pickBuddyLine(state: BuddyState): string {
-  const flat = candidatePools(state).flat();
-  const filled = flat.map((l) => fill(l, state));
-  const fresh = filled.filter((l) => !recent.includes(l));
-  const pickFrom = fresh.length ? fresh : filled;
-  const line = pickFrom[Math.floor(Math.random() * pickFrom.length)] ?? "Let's lock in.";
+export function pickBuddyLine(state: BuddyState): BuddyLine {
+  const pool = candidatePool(state);
+  const fresh = pool.filter((l) => !recent.includes(l.id));
+  const pickFrom = fresh.length ? fresh : pool;
+  const chosen =
+    pickFrom[Math.floor(Math.random() * pickFrom.length)] ??
+    ALL_LINES[0] ?? { id: "fallback", text: "Let's lock in." };
 
-  recent.push(line);
+  recent.push(chosen.id);
   while (recent.length > RECENT_MAX) recent.shift();
-  return line;
+  return { id: chosen.id, text: chosen.text };
 }
 
 /* ---------------------------------------------------------------------------
@@ -363,6 +285,76 @@ export function speakLine(text: string, opts?: { force?: boolean }): void {
     synth.speak(u);
   } catch {
     /* speech is a delight layer, never a hard dependency */
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Premium pre-generated audio (with Web-Speech fallback).
+   Each line has a stable id → /audio/buddy/<pack>/<id>.<ext>. If the file is
+   missing (not generated/deployed yet) or playback fails, we fall back to the
+   on-device Web Speech voice — so the buddy always talks, and silently upgrades
+   to premium the moment the audio is deployed.
+   ------------------------------------------------------------------------- */
+const AUDIO_PACK: string = (linesData as { pack?: string }).pack || "default";
+const AUDIO_EXT = "wav"; // Gemini TTS output; matches the generation script
+
+export function audioUrlFor(id: string): string {
+  return `/audio/buddy/${AUDIO_PACK}/${id}.${AUDIO_EXT}`;
+}
+
+let currentAudio: HTMLAudioElement | null = null;
+// Remember ids whose audio is missing so we stop hitting the network for them.
+const missingAudio = new Set<string>();
+
+function stopAudio(): void {
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+    } catch {
+      /* ignore */
+    }
+    currentAudio = null;
+  }
+}
+
+/**
+ * Speak a buddy line: prefer the pre-generated PREMIUM audio; if it's missing or
+ * fails, fall back to the on-device Web Speech voice. Best-effort, respects mute.
+ * Call from a user gesture (tap) so autoplay is allowed.
+ */
+export function playBuddyLine(line: BuddyLine, opts?: { force?: boolean }): void {
+  try {
+    if (!line || !line.text) return;
+    if (!opts?.force && isBuddyMuted()) return;
+
+    // Stop anything already playing/speaking so taps don't pile up.
+    cancelSpeech();
+    stopAudio();
+
+    if (typeof Audio === "undefined" || missingAudio.has(line.id)) {
+      speakLine(line.text, opts);
+      return;
+    }
+
+    const audio = new Audio(audioUrlFor(line.id));
+    currentAudio = audio;
+    const fallback = () => {
+      missingAudio.add(line.id); // don't retry this file this session
+      if (currentAudio === audio) currentAudio = null;
+      speakLine(line.text, opts);
+    };
+    audio.addEventListener("error", fallback, { once: true });
+    audio.addEventListener("ended", () => {
+      if (currentAudio === audio) currentAudio = null;
+    });
+    const p = audio.play();
+    if (p && typeof p.catch === "function") p.catch(fallback);
+  } catch {
+    try {
+      speakLine(line.text, opts);
+    } catch {
+      /* delight layer — never throw */
+    }
   }
 }
 
