@@ -56,8 +56,51 @@ function fireConfetti() {
   }
 }
 
+/** Light haptic feedback (progressive enhancement — ignored where unsupported,
+ *  e.g. iOS Safari). A non-visual channel that lands even under Reduce Motion. */
+export function buzz(pattern: number | number[]): void {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* not supported — ignore */
+  }
+}
+
+/** A short rising two-note "ignition" cue for STARTING a session (anticipation),
+ *  distinct from the success arpeggio. Front-loads a little reward on the
+ *  hardest moment — beginning. Best-effort + a light haptic tick. */
+export function playStartCue(): void {
+  try {
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AC) {
+      const ctx = new AC();
+      const now = ctx.currentTime;
+      [392, 587.33].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const t = now + i * 0.1;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.3);
+      });
+      window.setTimeout(() => void ctx.close().catch(() => {}), 900);
+    }
+  } catch {
+    /* audio unavailable — ignore */
+  }
+  buzz(18);
+}
+
 /** Celebrate a completed session. Safe to call from any event handler / any screen. */
 export function celebrate(): void {
   fireConfetti();
   playChime();
+  buzz([28, 40, 28, 40, 60]); // a celebratory triple-tap
 }

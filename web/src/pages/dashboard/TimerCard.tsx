@@ -18,13 +18,15 @@ import {
   useResumeSession,
   useFinishSession,
   useCancelSession,
+  useBuddy,
 } from "@/lib/queries";
 import type { SessionResponse } from "@/lib/types";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { formatClock, formatDuration, scoreToneClass } from "./utils";
 import { WorkLogSheet } from "./WorkLogSheet";
 import { CancelSessionDialog } from "./CancelSessionDialog";
-import { celebrate } from "@/lib/celebrate";
+import { celebrate, playStartCue } from "@/lib/celebrate";
+import { pickBuddyLine, playBuddyLine, type BuddyState } from "@/lib/buddySpeech";
 
 /** Seconds the ring loops over — a visual "sweep", not a hard goal (60 min). */
 const RING_PERIOD = 3600;
@@ -45,9 +47,23 @@ export function TimerCard() {
   const resume = useResumeSession();
   const finish = useFinishSession();
   const cancel = useCancelSession();
+  const { data: buddy } = useBuddy();
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+
+  // The buddy reacts at the two emotional peaks — starting (anticipation) and
+  // finishing (peak-end). Honors mute inside playBuddyLine.
+  function buddySpeak() {
+    if (!buddy) return;
+    const state: BuddyState = {
+      buddyName: buddy.buddy_name,
+      moodLevel: buddy.mood_level,
+      currentStreak: buddy.current_streak,
+      longestStreak: buddy.longest_streak,
+    };
+    playBuddyLine(pickBuddyLine(state));
+  }
   // Elapsed time FROZEN at the instant Finish is clicked — the log sheet shows
   // this, not the still-running live timer, so the duration stops climbing.
   const [frozenSeconds, setFrozenSeconds] = useState(0);
@@ -112,6 +128,10 @@ export function TimerCard() {
 
   // ---- Actions -----------------------------------------------------------
   function handleStart() {
+    // Ignition ritual — a tiny anticipation cue fired on the hardest moment
+    // (beginning), identical every time so it becomes a conditioned "go" signal.
+    playStartCue();
+    buddySpeak();
     start.mutate(undefined, {
       onError: (err) => {
         if (err instanceof ApiError && err.status === 409) {
@@ -176,7 +196,8 @@ export function TimerCard() {
       {
         onSuccess: (finished) => {
           setSheetOpen(false);
-          celebrate(); // confetti burst + success chime
+          celebrate(); // confetti burst + success chime + haptic
+          buddySpeak(); // buddy reacts — the warm, ceremonial "end" (peak-end rule)
           const score = finished.ai_score;
           const cls = typeof score === "number" ? scoreToneClass(score) : "text-teal-bright";
           toast.success(

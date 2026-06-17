@@ -22,9 +22,9 @@ log = logging.getLogger(__name__)
 
 # Mood level → human-readable label (mirrors streak_calculator.get_mood_level mapping)
 _MOOD_LABELS = {
-    1: "Devastated",
-    2: "Sad",
-    3: "Down",
+    1: "Sleepy",
+    2: "Quiet",
+    3: "Mellow",
     4: "Neutral",
     5: "Okay",
     6: "Content",
@@ -35,7 +35,7 @@ _MOOD_LABELS = {
 }
 
 _MOOD_EMOJI = {
-    1: "😢", 2: "😟", 3: "😔", 4: "😐", 5: "🙂",
+    1: "😴", 2: "😪", 3: "🙂", 4: "😐", 5: "🙂",
     6: "😊", 7: "😄", 8: "😁", 9: "🤩", 10: "🥳",
 }
 
@@ -203,8 +203,8 @@ async def check_buddy_mood_alerts() -> None:
         if prefs.get("push_enabled", True):
             await send_notification(
                 [user_id],
-                title=f"😢 {buddy_name} is devastated",
-                message=f"Your streak broke and {buddy_name} is feeling devastated. Start a session to cheer them up!",
+                title=f"{buddy_name} is ready when you are",
+                message=f"It's been a little while — a quick session gets you and {buddy_name} back in the groove.",
                 data={"type": "buddy_mood_alert", "mood_level": 1},
             )
 

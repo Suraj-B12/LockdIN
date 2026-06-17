@@ -12,11 +12,13 @@ export const BUDDY_COUNT = 15;
 export const MOOD_MIN = 1;
 export const MOOD_MAX = 10;
 
-/** Mood level (1–10) → human-readable label. Mirrors scheduler._MOOD_LABELS. */
+/** Mood level (1–10) → human-readable label. Mirrors scheduler._MOOD_LABELS.
+ *  Low moods are warm/neutral, never guilt-tripping ("the buddy is a pride
+ *  engine, not a guilt pet"): a quiet buddy is resting, not devastated. */
 export const MOOD_LABELS: Record<number, string> = {
-  1: "Devastated",
-  2: "Sad",
-  3: "Down",
+  1: "Sleepy",
+  2: "Quiet",
+  3: "Mellow",
   4: "Neutral",
   5: "Okay",
   6: "Content",
@@ -28,9 +30,9 @@ export const MOOD_LABELS: Record<number, string> = {
 
 /** Mood level (1–10) → emoji. Mirrors scheduler._MOOD_EMOJI. */
 export const MOOD_EMOJI: Record<number, string> = {
-  1: "😢",
-  2: "😟",
-  3: "😔",
+  1: "😴",
+  2: "😪",
+  3: "🙂",
   4: "😐",
   5: "🙂",
   6: "😊",

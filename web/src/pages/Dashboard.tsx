@@ -26,6 +26,7 @@ import { revealStagger, revealItem } from "@/lib/motion";
 // `pages/dashboard/` and this file `pages/Dashboard.tsx` differ only in case,
 // so a bare `./dashboard` specifier is ambiguous on case-insensitive systems.
 import { TimerCard } from "./dashboard/TimerCard";
+import { DailyRing } from "./dashboard/DailyRing";
 import { BuddyCard } from "./dashboard/BuddyCard";
 import { StreakCard } from "./dashboard/StreakCard";
 import { ScoreCard } from "./dashboard/ScoreCard";
@@ -122,6 +123,16 @@ export function Dashboard() {
         </h1>
         <p className="mt-2 text-sm text-ink-muted sm:text-base">{sub}</p>
       </motion.header>
+
+      {/* Today's closable focus goal — a frequent, reachable win. */}
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1], delay: reduce ? 0 : 0.06 }}
+        className="mb-6"
+      >
+        <DailyRing sessions={sessions} />
+      </motion.div>
 
       {/* Bento grid */}
       <motion.div

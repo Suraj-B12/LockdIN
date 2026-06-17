@@ -132,8 +132,8 @@ async def notify_streak_warning(user_id: str, streak_days: int):
     """Push: user's streak is at risk (no session today, streak >= 3)."""
     asyncio.create_task(send_notification(
         [user_id],
-        "⚠️ Don't break your streak!",
-        f"Lock in today to keep your {streak_days}-day streak alive 🔥",
+        f"🔥 Your {streak_days}-day streak is glowing",
+        "A quick session today keeps it going strong.",
         {"type": "streak_warning", "streak_days": streak_days}
     ))
 
