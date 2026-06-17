@@ -35,7 +35,7 @@ _MOOD_LABELS = {
 }
 
 _MOOD_EMOJI = {
-    1: "😴", 2: "😪", 3: "🙂", 4: "😐", 5: "🙂",
+    1: "😴", 2: "😪", 3: "😌", 4: "🙂", 5: "🙂",
     6: "😊", 7: "😄", 8: "😁", 9: "🤩", 10: "🥳",
 }
 
@@ -102,8 +102,8 @@ async def check_inactive_users() -> None:
             continue
 
         display_name = profile_res.data.get("display_name", "there")
-        mood_label = _MOOD_LABELS.get(mood_level, "Sad")
-        mood_emoji = _MOOD_EMOJI.get(mood_level, "😢")
+        mood_label = _MOOD_LABELS.get(mood_level, "Mellow")
+        mood_emoji = _MOOD_EMOJI.get(mood_level, "🙂")
 
         # Check notification preferences
         prefs = _get_prefs(db, user_id)

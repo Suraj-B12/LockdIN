@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Target, Confetti } from "@phosphor-icons/react";
 import { Avatar, Card } from "@/components/ui";
-import { useLeaderboard } from "@/lib/queries";
+import { useLeaderboard, useFriends } from "@/lib/queries";
 import { EASE_SMOOTH } from "@/lib/motion";
 
 const HOUR = 3600;
@@ -23,12 +23,16 @@ function fmtH(seconds: number): string {
 export function SquadChallenge() {
   const reduce = useReducedMotion();
   const { data, isLoading } = useLeaderboard("weekly");
+  const { data: friends } = useFriends();
 
   const model = useMemo(() => {
     const entries = data?.entries ?? [];
-    const members = entries.length;
     const combined = entries.reduce((acc, e) => acc + (e.total_seconds || 0), 0);
-    // Each member pulling ~5h/week reaches the goal; min one member's worth.
+    // Member count = your whole squad (you + accepted friends), NOT just those who
+    // logged this week — so the goal is FIXED for the week and the shared bar only
+    // ever moves forward (falls back to active entries until friends load).
+    const members = friends ? friends.length + 1 : Math.max(1, entries.length);
+    // Each member pulling ~5h/week reaches the goal.
     const goal = Math.max(1, members) * 5 * HOUR;
     const pct = goal > 0 ? Math.min(1, combined / goal) : 0;
     const reached = combined >= goal && combined > 0;
@@ -36,7 +40,7 @@ export function SquadChallenge() {
       .sort((a, b) => (b.total_seconds || 0) - (a.total_seconds || 0))
       .slice(0, 3);
     return { members, combined, goal, pct, reached, top, solo: members <= 1 };
-  }, [data]);
+  }, [data, friends]);
 
   // Nothing to rally around yet (no weekly activity) — stay out of the way.
   if (isLoading || model.members === 0 || model.combined === 0) return null;

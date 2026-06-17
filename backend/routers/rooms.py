@@ -99,22 +99,24 @@ def _build_room(db, room: dict, requester_id: str) -> dict:
     }
 
 
-def _require_participant(db, room_id: str, user_id: str) -> dict:
-    """Fetch the room and verify the requester is a (non-left) participant."""
-    room_id = valid_uuid(room_id, not_found_detail="Room not found.")
-    room = db.table("rooms").select("*").eq("id", room_id).execute()
+def _require_participant(db, room_id: str, user_id: str) -> tuple[dict, dict, str]:
+    """Fetch the room + the requester's (non-left) participant row, or raise.
+
+    Returns (room, participant, canonical_room_id)."""
+    rid = valid_uuid(room_id, not_found_detail="Room not found.")
+    room = db.table("rooms").select("*").eq("id", rid).execute()
     if not room.data:
         raise HTTPException(status_code=404, detail="Room not found.")
 
     part = db.table("room_participants") \
-        .select("id, status") \
-        .eq("room_id", room_id) \
+        .select("id, status, focus_seconds, last_seen") \
+        .eq("room_id", rid) \
         .eq("user_id", user_id) \
         .execute()
     if not part.data or part.data[0].get("status") == "left":
         raise HTTPException(status_code=403, detail="Join the room first.")
 
-    return room.data[0]
+    return room.data[0], part.data[0], rid
 
 
 @router.post("/", response_model=RoomResponse)
@@ -157,6 +159,9 @@ async def create_room(user: dict = Depends(get_current_user)):
 @router.post("/join", response_model=RoomResponse)
 async def join_room(body: RoomJoin, user: dict = Depends(get_current_user)):
     """Join an open/active room by its code (idempotent — rejoin re-activates you)."""
+    if not await rate_limit_ok(f"room:join:{user['id']}", 2):
+        raise HTTPException(status_code=429, detail="Slow down a moment.")
+
     code = body.code.strip().upper()
     db = get_supabase()
 
@@ -184,7 +189,14 @@ async def join_room(body: RoomJoin, user: dict = Depends(get_current_user)):
                 "status": "joined",
             }).execute()
         except Exception:
-            pass  # concurrent join won the UNIQUE(room_id,user_id) race — fine
+            pass  # likely the UNIQUE(room_id,user_id) race — verified below
+
+    # Confirm membership actually landed (so a genuinely-failed insert surfaces
+    # instead of returning a phantom-joined room that then 403s on every poll).
+    check = db.table("room_participants").select("id") \
+        .eq("room_id", room["id"]).eq("user_id", user["id"]).neq("status", "left").execute()
+    if not check.data:
+        raise HTTPException(status_code=500, detail="Could not join the room. Please try again.")
 
     return _build_room(db, room, user["id"])
 
@@ -193,16 +205,20 @@ async def join_room(body: RoomJoin, user: dict = Depends(get_current_user)):
 async def heartbeat(room_id: str, body: RoomHeartbeat, user: dict = Depends(get_current_user)):
     """Keep the requester 'live' and report focus progress (polled by the client)."""
     db = get_supabase()
-    _require_participant(db, room_id, user["id"])
+    _, participant, rid = _require_participant(db, room_id, user["id"])
 
     update = {"last_seen": _now().isoformat()}
     if body.focus_seconds is not None:
-        update["focus_seconds"] = body.focus_seconds
+        # Monotonic only: a participant's reported contribution can grow but never
+        # shrink, so a misreporting/stale client can't rewind the shared tally.
+        prev = participant.get("focus_seconds") or 0
+        if body.focus_seconds >= prev:
+            update["focus_seconds"] = body.focus_seconds
     if body.focusing is not None:
         update["status"] = "focusing" if body.focusing else "joined"
 
     db.table("room_participants").update(update) \
-        .eq("room_id", valid_uuid(room_id)) \
+        .eq("room_id", rid) \
         .eq("user_id", user["id"]) \
         .execute()
     return {"ok": True}
@@ -212,7 +228,7 @@ async def heartbeat(room_id: str, body: RoomHeartbeat, user: dict = Depends(get_
 async def get_room(room_id: str, user: dict = Depends(get_current_user)):
     """Poll a room: its participants, live presence, and combined focus."""
     db = get_supabase()
-    room = _require_participant(db, room_id, user["id"])
+    room, _, _ = _require_participant(db, room_id, user["id"])
     return _build_room(db, room, user["id"])
 
 

@@ -130,8 +130,11 @@ export function TimerCard() {
   function handleStart() {
     // Ignition ritual — a tiny anticipation cue fired on the hardest moment
     // (beginning), identical every time so it becomes a conditioned "go" signal.
-    playStartCue();
-    buddySpeak();
+    // Skip it if a session somehow already exists (the start would 409/resync).
+    if (!session) {
+      playStartCue();
+      buddySpeak();
+    }
     start.mutate(undefined, {
       onError: (err) => {
         if (err instanceof ApiError && err.status === 409) {

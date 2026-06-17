@@ -51,7 +51,9 @@ export function DailyRing({ sessions }: { sessions: SessionResponse[] }) {
   const celebratedRef = useRef(false);
   useEffect(() => {
     if (!done) return;
-    const key = `lockdin:dailyDone:${todayKey()}:${goalMin}`;
+    // Day-scoped (not goal-scoped) so lowering the tier after finishing doesn't
+    // re-fire the celebration — the day's first completion is the one win.
+    const key = `lockdin:dailyDone:${todayKey()}`;
     let already = false;
     try {
       already = localStorage.getItem(key) === "1";

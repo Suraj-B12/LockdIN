@@ -121,7 +121,7 @@ async def send_inactivity_reminder(
     html = render_template("inactivity_reminder.html", context)
     await send_email_via_onesignal(
         [user_id],
-        subject=f"Your buddy misses you 🥺 — it's been {days_inactive} days",
+        subject=f"Pick up where you left off — it's been {days_inactive} days",
         html_body=html,
     )
 
@@ -172,6 +172,6 @@ async def send_buddy_mood_alert_email(
     html = render_template("buddy_mood_alert.html", context)
     await send_email_via_onesignal(
         [user_id],
-        subject=f"{buddy_name} is feeling devastated 😢 — start a session to help",
+        subject=f"{buddy_name} is ready when you are — a quick session gets you both going",
         html_body=html,
     )

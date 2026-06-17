@@ -84,7 +84,7 @@ export function computeInsights(sessions: SessionResponse[]): {
     insights.push({
       kind: "best-day",
       headline: `${WEEKDAYS[topDayIdx]}s are your strongest day`,
-      value: `${fmtHours(daySecs[topDayIdx])} on average week`,
+      value: `${fmtHours(daySecs[topDayIdx])} total`,
     });
   }
 

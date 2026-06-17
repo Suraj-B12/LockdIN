@@ -32,8 +32,8 @@ export const MOOD_LABELS: Record<number, string> = {
 export const MOOD_EMOJI: Record<number, string> = {
   1: "😴",
   2: "😪",
-  3: "🙂",
-  4: "😐",
+  3: "😌",
+  4: "🙂",
   5: "🙂",
   6: "😊",
   7: "😄",

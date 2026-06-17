@@ -5,7 +5,8 @@
    (so it still scores + counts toward your streak); the room layers live
    company on top. Degrades gracefully if rooms aren't enabled yet (migration 007).
    ===================================================================== */
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   UsersThree,
@@ -17,6 +18,7 @@ import {
   Play,
   Flag,
   Circle,
+  ArrowClockwise,
 } from "@phosphor-icons/react";
 import { Avatar, Button, Card, EyebrowTag, Input, Reveal, Skeleton } from "@/components/ui";
 import { ApiError } from "@/lib/api";
@@ -29,7 +31,9 @@ import {
   useRoomHeartbeat,
   useActiveSession,
   useStartSession,
+  useResumeSession,
   useFinishSession,
+  qk,
 } from "@/lib/queries";
 import type { RoomResponse, SessionResponse } from "@/lib/types";
 import { formatClock, formatDuration, scoreToneClass } from "./dashboard/utils";
@@ -154,11 +158,13 @@ function Lobby() {
 
 /* ---- In-room view: presence + your focus ---- */
 function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }) {
-  const { data: room } = useRoom(roomId, true);
+  const qc = useQueryClient();
+  const { data: room, isError } = useRoom(roomId, true);
   const r = room ?? initial;
 
   const { data: session } = useActiveSession();
   const start = useStartSession();
+  const resume = useResumeSession();
   const finish = useFinishSession();
   const heartbeat = useRoomHeartbeat();
   const leave = useLeaveRoom();
@@ -166,37 +172,46 @@ function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }
   const [copied, setCopied] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [frozen, setFrozen] = useState(0);
-  const [tick, setTick] = useState(0); // 1s display tick while focusing
+  const [, forceRender] = useReducer((n: number) => n + 1, 0); // 1s display re-render
 
   const isActive = session?.status === "active";
+  const isPaused = session?.status === "paused";
 
-  // Display tick for your own live timer.
+  // Re-render once a second so your live timer ticks.
   useEffect(() => {
     if (!isActive) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    const id = setInterval(forceRender, 1000);
     return () => clearInterval(id);
   }, [isActive]);
 
-  // Heartbeat: keep presence live + report focus contribution every ~10s.
+  // If the room poll definitively fails (closed / left elsewhere → 403/404),
+  // drop back to the lobby instead of showing a stale snapshot.
+  useEffect(() => {
+    if (isError) qc.setQueryData(qk.activeRoom, null);
+  }, [isError, qc]);
+
+  // Heartbeat: keep presence live + report focus contribution every ~10s. Read
+  // the latest session via a ref so a poll-driven session change (or a cross-
+  // device pause/resume) doesn't report stale elapsed or rebuild the interval.
   const hb = useRef(heartbeat);
   hb.current = heartbeat;
+  const sessRef = useRef(session);
+  sessRef.current = session;
   useEffect(() => {
     const beat = () => {
-      const focusing = session?.status === "active";
-      const body = focusing
-        ? { focus_seconds: Math.floor(liveElapsed(session as SessionResponse)), focusing: true }
-        : { focusing: false }; // omit focus_seconds → server preserves your last value
+      const s = sessRef.current;
+      const body =
+        s?.status === "active"
+          ? { focus_seconds: Math.floor(liveElapsed(s)), focusing: true }
+          : { focusing: false }; // omit focus_seconds → server preserves your last value
       hb.current.mutate({ id: roomId, body });
     };
     beat();
     const id = setInterval(beat, 10_000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, session?.id, session?.status]);
+  }, [roomId]);
 
   const myElapsed = isActive ? Math.floor(liveElapsed(session as SessionResponse)) : 0;
-  // `tick` is read so the elapsed display re-renders each second.
-  void tick;
 
   const copyCode = async () => {
     try {
@@ -225,6 +240,11 @@ function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }
         ),
     });
 
+  const onResume = () =>
+    resume.mutate(session?.id ?? "", {
+      onError: (err) => toast.error(err instanceof Error ? err.message : "Couldn't resume."),
+    });
+
   const openFinish = () => {
     if (!session) return;
     setFrozen(isActive ? Math.floor(liveElapsed(session)) : Math.floor(session.total_seconds));
@@ -239,6 +259,12 @@ function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }
         onSuccess: (done) => {
           setSheetOpen(false);
           celebrate();
+          // Land the final segment in the shared tally, then refresh the room
+          // immediately (don't wait up to ~10s for the next poll).
+          hb.current.mutate(
+            { id: roomId, body: { focus_seconds: Math.floor(done.total_seconds), focusing: false } },
+            { onSettled: () => qc.invalidateQueries({ queryKey: qk.room(roomId) }) }
+          );
           const score = done.ai_score;
           const cls = typeof score === "number" ? scoreToneClass(score) : "text-teal-bright";
           toast.success(
@@ -302,21 +328,37 @@ function RoomView({ roomId, initial }: { roomId: string; initial: RoomResponse }
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-eyebrow text-teal-bright">
-              {isActive ? "You're locked in" : "Your turn"}
+              {isActive ? "You're locked in" : isPaused ? "Paused" : "Your turn"}
             </p>
             <p className="mt-1 font-mono text-3xl font-semibold tabular leading-none text-ink">
-              {isActive ? formatClock(myElapsed) : "00:00:00"}
+              {isActive
+                ? formatClock(myElapsed)
+                : isPaused
+                  ? formatClock(Math.floor(session?.total_seconds ?? 0))
+                  : "00:00:00"}
             </p>
           </div>
           <div className="flex gap-2">
-            {!isActive ? (
+            {!session ? (
               <Button variant="primary" leadingIcon={Play} onClick={onStart} disabled={start.isPending}>
                 {start.isPending ? "Starting…" : "Lock in"}
               </Button>
             ) : (
-              <Button variant="outline" leadingIcon={Flag} onClick={openFinish} disabled={finish.isPending}>
-                Finish
-              </Button>
+              <>
+                {isPaused && (
+                  <Button
+                    variant="primary"
+                    leadingIcon={ArrowClockwise}
+                    onClick={onResume}
+                    disabled={resume.isPending}
+                  >
+                    {resume.isPending ? "Resuming…" : "Resume"}
+                  </Button>
+                )}
+                <Button variant="outline" leadingIcon={Flag} onClick={openFinish} disabled={finish.isPending}>
+                  Finish
+                </Button>
+              </>
             )}
           </div>
         </div>
