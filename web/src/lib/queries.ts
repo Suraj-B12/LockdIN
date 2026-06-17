@@ -28,6 +28,9 @@ import type {
   ProfileUpdate,
   AuthMeResponse,
   FriendProfileResponse,
+  RoomResponse,
+  RoomJoinBody,
+  RoomHeartbeatBody,
 } from "./types";
 
 /* ---- Query keys (stable, centralized) ---- */
@@ -46,6 +49,8 @@ export const qk = {
   me: ["users", "me"] as const,
   userOverview: (userId: string) => ["users", "overview", userId] as const,
   authMe: ["auth", "me"] as const,
+  activeRoom: ["rooms", "active"] as const,
+  room: (id: string) => ["rooms", id] as const,
 };
 
 /* =====================================================================
@@ -346,5 +351,72 @@ export function useAuthMe() {
   return useQuery({
     queryKey: qk.authMe,
     queryFn: ({ signal }) => api.get<AuthMeResponse>("/auth/me", { signal }),
+  });
+}
+
+/* =====================================================================
+   Rooms (Lock In Together)
+   ===================================================================== */
+
+/** GET /rooms/active/me → RoomResponse | null. Fails safe (null) pre-migration. */
+export function useActiveRoom(options?: Partial<UseQueryOptions<RoomResponse | null>>) {
+  return useQuery({
+    queryKey: qk.activeRoom,
+    queryFn: ({ signal }) => api.get<RoomResponse | null>("/rooms/active/me", { signal }),
+    refetchInterval: 20_000,
+    ...options,
+  });
+}
+
+/** GET /rooms/{id} → RoomResponse. Polls while in the room. */
+export function useRoom(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.room(id ?? ""),
+    queryFn: ({ signal }) => api.get<RoomResponse>(`/rooms/${id}`, { signal }),
+    enabled: !!id && enabled,
+    refetchInterval: 10_000,
+  });
+}
+
+/** POST /rooms/ → RoomResponse (open a room you host). */
+export function useCreateRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<RoomResponse>("/rooms/"),
+    onSuccess: (room) => {
+      qc.setQueryData(qk.activeRoom, room);
+      qc.setQueryData(qk.room(room.id), room);
+    },
+  });
+}
+
+/** POST /rooms/join {code} → RoomResponse. */
+export function useJoinRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RoomJoinBody) => api.post<RoomResponse>("/rooms/join", body),
+    onSuccess: (room) => {
+      qc.setQueryData(qk.activeRoom, room);
+      qc.setQueryData(qk.room(room.id), room);
+    },
+  });
+}
+
+/** POST /rooms/{id}/leave. */
+export function useLeaveRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ ok: boolean }>(`/rooms/${id}/leave`),
+    onSuccess: () => {
+      qc.setQueryData(qk.activeRoom, null);
+    },
+  });
+}
+
+/** POST /rooms/{id}/heartbeat — keep-alive + report focus progress. */
+export function useRoomHeartbeat() {
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: RoomHeartbeatBody }) =>
+      api.post<{ ok: boolean }>(`/rooms/${id}/heartbeat`, body),
   });
 }

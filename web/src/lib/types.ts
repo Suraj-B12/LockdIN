@@ -186,6 +186,38 @@ export interface FriendProfileResponse {
   shared_streak?: number | null;
 }
 
+/* ---- Rooms (Lock In Together) ---- */
+export interface RoomParticipant {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  status: "joined" | "focusing" | "done" | "left" | string;
+  focus_seconds: number;
+  live: boolean;
+}
+
+export interface RoomResponse {
+  id: string;
+  code: string;
+  host_id: string;
+  status: "open" | "active" | "closed" | string;
+  created_at: string;
+  started_at: string | null;
+  is_host: boolean;
+  combined_seconds: number;
+  live_count: number;
+  participants: RoomParticipant[];
+}
+
+export interface RoomJoinBody {
+  code: string;
+}
+
+export interface RoomHeartbeatBody {
+  focus_seconds?: number;
+  focusing?: boolean;
+}
+
 /* ---- Auth ---- */
 export interface AuthMeResponse {
   id: string;

@@ -25,6 +25,7 @@ const Privacy = lazy(() => import("@/pages/Privacy").then((m) => ({ default: m.P
 const Terms = lazy(() => import("@/pages/Terms").then((m) => ({ default: m.Terms })));
 const Dashboard = lazy(() => import("@/pages/Dashboard").then((m) => ({ default: m.Dashboard })));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard").then((m) => ({ default: m.Leaderboard })));
+const Rooms = lazy(() => import("@/pages/Rooms").then((m) => ({ default: m.Rooms })));
 const History = lazy(() => import("@/pages/History").then((m) => ({ default: m.History })));
 const Profile = lazy(() => import("@/pages/Profile").then((m) => ({ default: m.Profile })));
 const FriendProfile = lazy(() => import("@/pages/FriendProfile").then((m) => ({ default: m.FriendProfile })));
@@ -63,6 +64,7 @@ export default function App() {
                 }
               >
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/rooms" element={<Rooms />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/profile" element={<Profile />} />

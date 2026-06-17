@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 
 const APP_NAV: NavItem[] = [
   { label: "Dashboard", to: "/dashboard" },
+  { label: "Together", to: "/rooms" },
   { label: "Leaderboard", to: "/leaderboard" },
   { label: "History", to: "/history" },
   { label: "Profile", to: "/profile" },

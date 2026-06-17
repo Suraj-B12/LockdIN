@@ -166,6 +166,39 @@ class FriendActivityResponse(BaseModel):
     items: list[FriendActivityItem] = Field(default_factory=list)
 
 
+# ========== ROOMS (Lock In Together) ==========
+
+class RoomParticipantOut(BaseModel):
+    user_id: UUID
+    display_name: str
+    avatar_url: Optional[str] = None
+    status: str  # joined | focusing | done | left
+    focus_seconds: int = 0
+    live: bool = False  # last_seen within the liveness window
+
+
+class RoomResponse(BaseModel):
+    id: UUID
+    code: str
+    host_id: UUID
+    status: str  # open | active | closed
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    is_host: bool = False
+    combined_seconds: int = 0
+    live_count: int = 0
+    participants: list[RoomParticipantOut] = Field(default_factory=list)
+
+
+class RoomJoin(BaseModel):
+    code: str = Field(..., min_length=3, max_length=12)
+
+
+class RoomHeartbeat(BaseModel):
+    focus_seconds: Optional[int] = Field(None, ge=0, le=86_400)
+    focusing: Optional[bool] = None
+
+
 # ========== LEADERBOARD ==========
 
 class LeaderboardEntry(BaseModel):
