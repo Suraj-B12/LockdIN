@@ -9,7 +9,7 @@ import { CaretDown } from "@phosphor-icons/react";
 import { Badge, Button } from "@/components/ui";
 import { ReactionBar } from "@/components/ReactionBar";
 import { cn } from "@/lib/cn";
-import type { SessionResponse, ReactionMap, ReactionEmoji } from "@/lib/types";
+import type { SessionResponse, ReactionMap, ReactionEmoji, ReactionState } from "@/lib/types";
 import { relativeDay, clockTime, formatDuration } from "./dates";
 
 const PAGE = 8;
@@ -83,7 +83,7 @@ function SessionRow({
 }: {
   session: SessionResponse;
   isLast: boolean;
-  reactionState?: import("@/lib/types").ReactionState;
+  reactionState?: ReactionState;
   onReact?: (sessionId: string, emoji: ReactionEmoji) => void;
 }) {
   const stamp = session.finished_at ?? session.started_at;

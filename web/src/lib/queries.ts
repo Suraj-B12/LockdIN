@@ -445,18 +445,27 @@ export function useToggleReaction() {
   return useMutation({
     mutationFn: ({ sessionId, emoji }: { sessionId: string; emoji: ReactionEmoji }) =>
       api.post<ReactionState>(`/reactions/${sessionId}`, { emoji }),
-    onMutate: ({ sessionId, emoji }) => {
-      // Optimistically toggle across every cached batch map for instant feedback.
+    onMutate: async ({ sessionId, emoji }) => {
+      // Cancel in-flight batch refetches so a stale one can't clobber our write.
+      await qc.cancelQueries({ queryKey: ["reactions", "batch"] });
+      // Snapshot every batch map so onError can revert instantly on 403/404/etc.
+      const prev = qc.getQueriesData<ReactionMap>({ queryKey: ["reactions", "batch"] });
+      // Optimistically toggle for instant give-only feedback. `old ?? {}` lets the
+      // very first tap render even before the batch fetch has landed.
       qc.setQueriesData<ReactionMap>({ queryKey: ["reactions", "batch"] }, (old) => {
-        if (!old) return old;
-        const st = old[sessionId] ?? { counts: {}, mine: [] };
+        const base = old ?? {};
+        const st = base[sessionId] ?? { counts: {}, mine: [] };
         const has = st.mine.includes(emoji);
         const counts = { ...st.counts };
         counts[emoji] = (counts[emoji] ?? 0) + (has ? -1 : 1);
         if ((counts[emoji] ?? 0) <= 0) delete counts[emoji];
         const mine = has ? st.mine.filter((e) => e !== emoji) : [...st.mine, emoji];
-        return { ...old, [sessionId]: { counts, mine } };
+        return { ...base, [sessionId]: { counts, mine } };
       });
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      ctx?.prev?.forEach(([k, data]) => qc.setQueryData(k, data));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["reactions", "batch"] }),
   });
